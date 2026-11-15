@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Pedido #{{ o.PedidoId }} · TiendaTech</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body class="impresion">
+{% import 'macros.html' as m with context %}
+<div class="hoja">
+  <div class="encabezado">
+    <div><div class="marca">Tienda<b>Tech</b></div><small>Comprobante de pedido (simulado, sin valor fiscal)</small></div>
+    <div class="derecha"><h1>Pedido #{{ o.PedidoId }}</h1>{{ o.FechaPedido|fecha_hora }}<br>Estado: <b>{{ o.Estado }}</b></div>
+  </div>
+  <div class="tres">
+    <div><h3>Cliente</h3>{{ o.Cliente }}<br>{{ o.Identificacion }}<br>{{ o.Correo }}{% if o.Telefono %}<br>Tel. {{ o.Telefono }}{% endif %}</div>
+    <div><h3>Entrega</h3>{{ o.DireccionDetalle }}<br>{{ o.Distrito }}, {{ o.Canton }}, {{ o.Provincia }}<br>{{ o.Zona }}{% if o.NumeroGuia %}<br>Guía {{ o.NumeroGuia }}{% endif %}</div>
+    <div><h3>Pago</h3>{{ o.MetodoPago }}<br>{{ o.EstadoPago }}<br>Ref. {{ o.ReferenciaPago }}</div>
+  </div>
+  {{ m.resumen_pedido(o, lineas) }}
+  <p class="no-imprimir centro">
+    <button class="boton" onclick="window.print()">Imprimir o guardar como PDF</button>
+  </p>
+</div>
+</body>
+</html>

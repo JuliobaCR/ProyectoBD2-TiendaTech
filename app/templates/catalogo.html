@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Catálogo{% endblock %}
+{% block contenido %}
+<div class="con-lateral">
+  <aside class="panel filtros">
+    <h2>Filtros</h2>
+    <form method="get" class="formulario">
+      <label>Palabra clave <input type="search" name="q" value="{{ request.args.get('q', '') }}"></label>
+      <label>Categoría
+        <select name="categoria">
+          <option value="">Todas</option>
+          {% for c in categorias %}<option value="{{ c.CategoriaId }}" {{ 'selected' if request.args.get('categoria') == c.CategoriaId|string }}>{{ c.Nombre }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Marca
+        <select name="marca">
+          <option value="">Todas</option>
+          {% for x in marcas %}<option value="{{ x.MarcaId }}" {{ 'selected' if request.args.get('marca') == x.MarcaId|string }}>{{ x.Nombre }}</option>{% endfor %}
+        </select>
+      </label>
+      <div class="dos">
+        <label>Precio mín. <input type="number" name="min" min="0" step="500" value="{{ request.args.get('min', '') }}"></label>
+        <label>Precio máx. <input type="number" name="max" min="0" step="500" value="{{ request.args.get('max', '') }}"></label>
+      </div>
+      <label class="casilla"><input type="checkbox" name="ofertas" value="1" {{ 'checked' if request.args.get('ofertas') }}> Solo ofertas vigentes</label>
+      <label class="casilla"><input type="checkbox" name="disponibles" value="1" {{ 'checked' if request.args.get('disponibles') }}> Solo con existencia</label>
+      <label>Ordenar por
+        <select name="orden">
+          {% for v, t in [('nombre', 'Nombre'), ('precio_asc', 'Precio: menor a mayor'), ('precio_desc', 'Precio: mayor a menor'), ('calificacion', 'Mejor calificados')] %}
+          <option value="{{ v }}" {{ 'selected' if request.args.get('orden') == v }}>{{ t }}</option>{% endfor %}
+        </select>
+      </label>
+      <button class="boton">Aplicar</button>
+      <a class="enlace" href="{{ url_for('tienda.catalogo') }}">Limpiar filtros</a>
+    </form>
+  </aside>
+
+  <div>
+    {% if not hay_filtros %}
+      <section class="heroe">
+        <span class="sobre">{{ promociones|join(' · ') if promociones else 'Tecnología para todo el país' }}</span>
+        <h1>La tecnología que busca, al mejor precio.</h1>
+        <p>Laptops, celulares, audio y accesorios de las mejores marcas, con envío a todo Costa Rica y garantía de 12 meses.</p>
+        <div class="en-fila">
+          <a class="boton" href="{{ url_for('tienda.catalogo', ofertas=1) }}">Ver ofertas vigentes</a>
+          <a class="boton fantasma" href="#catalogo">Explorar el catálogo</a>
+        </div>
+      </section>
+      <div class="ventajas">
+        <div><b>Envío a todo el país</b>Tarifa según su zona, desde ₡2 500</div>
+        <div><b>Garantía de 12 meses</b>En todos los productos</div>
+        <div><b>Pago con tarjeta o SINPE</b>Confirmación inmediata con tarjeta</div>
+        <div><b>Cancelación sin costo</b>Mientras el pedido no se haya enviado</div>
+      </div>
+      <div class="chips">
+        {% for c in categorias %}<a href="{{ url_for('tienda.catalogo', categoria=c.CategoriaId) }}">{{ c.Nombre }}</a>{% endfor %}
+      </div>
+      {% if ofertas %}
+        <div class="titulo-seccion"><h2>Ofertas vigentes</h2><a href="{{ url_for('tienda.catalogo', ofertas=1) }}">Ver todas las ofertas →</a></div>
+        <div class="rejilla">{% for p in ofertas %}{{ m.tarjeta(p) }}{% endfor %}</div>
+      {% endif %}
+      {% if destacados %}
+        <div class="titulo-seccion"><h2>Productos destacados</h2></div>
+        <div class="rejilla">{% for p in destacados %}{{ m.tarjeta(p) }}{% endfor %}</div>
+      {% endif %}
+      <div class="titulo-seccion" id="catalogo"><h2>Todo el catálogo <small class="tenue">{{ productos|length }} productos</small></h2></div>
+    {% else %}
+      <div class="titulo-seccion"><h2>Resultados <small class="tenue">{{ productos|length }} productos</small></h2><a href="{{ url_for('tienda.catalogo') }}">Quitar filtros</a></div>
+    {% endif %}
+    <div class="rejilla">
+      {% for p in productos %}{{ m.tarjeta(p) }}{% else %}<p class="vacio">No hay productos que coincidan con la búsqueda.</p>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

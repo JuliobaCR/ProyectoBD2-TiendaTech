@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Mis pedidos{% endblock %}
+{% block contenido %}
+<h1>Mis pedidos</h1>
+<section class="panel">
+  <table>
+    <thead><tr><th>Pedido</th><th>Fecha</th><th>Estado</th><th class="num">Productos</th><th class="num">Unidades</th><th class="num">Total</th><th></th></tr></thead>
+    <tbody>
+    {% for o in pedidos %}
+      <tr>
+        <td><a href="{{ url_for('tienda.pedido', pedido_id=o.PedidoId) }}">#{{ o.PedidoId }}</a></td>
+        <td>{{ o.FechaPedido|fecha_hora }}</td>
+        <td>{{ m.estado_pedido(o.Estado) }}</td>
+        <td class="num">{{ o.Lineas }}</td><td class="num">{{ o.Unidades }}</td>
+        <td class="num"><b>{{ o.Total|dinero }}</b></td>
+        <td><a href="{{ url_for('tienda.pedido', pedido_id=o.PedidoId) }}">Ver detalle</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="vacio">Todavía no ha hecho pedidos.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

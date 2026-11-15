@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}{{ p.Nombre if p else 'Nuevo producto' }}{% endblock %}
+{% block contenido %}
+{% set v = p if p else {} %}
+<p class="migas"><a href="{{ url_for('admin.productos') }}">Productos</a> › {{ p.Nombre if p else 'Nuevo' }}</p>
+<h1>{{ p.Nombre if p else 'Nuevo producto' }}{% if p and not p.Activo %} <span class="etiqueta agotado">Inactivo</span>{% endif %}</h1>
+
+<section class="panel">
+  <form method="post" class="formulario">
+    {{ m.csrf_campo() }}
+    <div class="dos">
+      <label>SKU (único) <input name="sku" value="{{ v.SKU or f.get('sku', '') }}" required maxlength="20"></label>
+      <label>Nombre <input name="nombre" value="{{ v.Nombre or f.get('nombre', '') }}" required maxlength="120"></label>
+    </div>
+    <div class="dos">
+      <label>Marca
+        <select name="marca_id" required>
+          <option value="">Seleccione…</option>
+          {% for x in marcas %}<option value="{{ x.MarcaId }}" {{ 'selected' if (v.MarcaId or f.get('marca_id', '')|int) == x.MarcaId }}>{{ x.Nombre }}{{ '' if x.Activo else ' (inactiva)' }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Categoría
+        <select name="categoria_id" required>
+          <option value="">Seleccione…</option>
+          {% for x in categorias %}<option value="{{ x.CategoriaId }}" {{ 'selected' if (v.CategoriaId or f.get('categoria_id', '')|int) == x.CategoriaId }}>{{ x.Nombre }}{{ '' if x.Activo else ' (inactiva)' }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <label>Descripción <textarea name="descripcion" rows="2" maxlength="500">{{ v.Descripcion or f.get('descripcion', '') }}</textarea></label>
+    <label>Especificaciones (separadas por punto y coma) <textarea name="especificaciones" rows="2" maxlength="1000">{{ v.Especificaciones or f.get('especificaciones', '') }}</textarea></label>
+    <div class="tres-campos">
+      <label>Precio de venta (₡) <input type="number" name="precio" value="{{ v.Precio or f.get('precio', '') }}" min="1" step="0.01" required></label>
+      <label>Costo (₡) <input type="number" name="costo" value="{{ v.Costo if v.Costo is not none and v.Costo is defined else f.get('costo', '') }}" min="0" step="0.01" required></label>
+      <label>Mínimo de inventario <input type="number" name="stock_minimo" value="{{ v.StockMinimo if v.StockMinimo is defined else f.get('stock_minimo', 0) }}" min="0" required></label>
+    </div>
+    {% if p %}
+      <p class="tenue">Existencia actual: <b>{{ p.Existencia }}</b>. La existencia solo cambia con movimientos de inventario
+        (<a href="{{ url_for('admin.inventario', producto=p.ProductoId) }}">ver movimientos</a>).</p>
+    {% else %}
+      <label>Existencia inicial <input type="number" name="stock_inicial" value="{{ f.get('stock_inicial', 0) }}" min="0" required></label>
+    {% endif %}
+    <label>Imagen principal (URL o ruta) <input name="imagen_url" value="{{ v.ImagenUrl or f.get('imagen_url', '') }}" maxlength="400" placeholder="https://… o /static/img/productos/archivo.svg"></label>
+    <label class="casilla"><input type="checkbox" name="destacado" value="1" {{ 'checked' if v.Destacado or f.get('destacado') }}> Producto destacado en la portada</label>
+    <button class="boton">{{ 'Guardar cambios' if p else 'Crear producto' }}</button>
+  </form>
+</section>
+
+{% if p %}
+<div class="dos-columnas">
+  <section class="panel">
+    <h2>Imágenes</h2>
+    <div class="miniaturas">
+      {% for i in imagenes %}
+        <form method="post">{{ m.csrf_campo() }}<input type="hidden" name="accion" value="quitar_imagen"><input type="hidden" name="imagen_id" value="{{ i.ImagenId }}">
+          <img src="{{ i.Url }}" alt="Imagen"><br>
+          {% if i.EsPrincipal %}<small>Principal</small>{% else %}<button class="enlace peligro">Quitar</button>{% endif %}
+        </form>
+      {% else %}<p class="vacio">Sin imágenes.</p>{% endfor %}
+    </div>
+    <form method="post" class="en-fila">
+      {{ m.csrf_campo() }}<input type="hidden" name="accion" value="imagen">
+      <input name="url" placeholder="URL o ruta de otra imagen" class="largo" required maxlength="400">
+      <button class="boton chico secundario">Agregar imagen</button>
+    </form>
+  </section>
+  <section class="panel">
+    <h2>Estado</h2>
+    <p class="tenue">Un producto con historial no se elimina: se desactiva y deja de mostrarse en la tienda, pero los pedidos anteriores lo conservan.</p>
+    <form method="post">
+      {{ m.csrf_campo() }}<input type="hidden" name="accion" value="estado">
+      {% if p.Activo %}
+        <button class="boton peligro">Desactivar producto</button>
+      {% else %}
+        <input type="hidden" name="activo" value="1"><button class="boton">Reactivar producto</button>
+      {% endif %}
+    </form>
+  </section>
+</div>
+{% endif %}
+{% endblock %}

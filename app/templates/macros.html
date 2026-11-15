@@ -1,0 +1,89 @@
+{% macro csrf_campo() %}<input type="hidden" name="_csrf" value="{{ csrf() }}">{% endmacro %}
+
+{% macro estrellas(valor) %}{% if valor %}<span class="estrellas" title="{{ valor }} de 5">{% for i in range(1, 6) %}{{ '★' if i <= valor|round|int else '☆' }}{% endfor %}</span>{% endif %}{% endmacro %}
+
+{% macro tarjeta(p) %}
+<article class="tarjeta">
+  {% if not p.Disponible %}<span class="cinta gris">Agotado</span>
+  {% elif p.DescuentoUnitario > 0 %}<span class="cinta">−{{ (p.DescuentoUnitario * 100 / p.Precio)|round|int }} %</span>{% endif %}
+  <a class="foto" href="{{ url_for('tienda.producto', producto_id=p.ProductoId) }}" tabindex="-1" aria-hidden="true">
+    <img src="{{ p.ImagenUrl or url_for('static', filename='img/sin-imagen.svg') }}" alt="" loading="lazy">
+  </a>
+  <div class="cuerpo">
+    <small>{{ p.Marca }} · {{ p.Categoria }}</small>
+    <a class="nombre" href="{{ url_for('tienda.producto', producto_id=p.ProductoId) }}">{{ p.Nombre }}</a>
+    {% if p.TotalResenas %}<div class="calificacion">{{ estrellas(p.CalificacionPromedio) }} <small>{{ p.CalificacionPromedio }} ({{ p.TotalResenas }})</small></div>{% endif %}
+    <div class="precio">
+      {% if p.DescuentoUnitario > 0 %}<b>{{ p.PrecioFinal|dinero }}</b> <s>{{ p.Precio|dinero }}</s>
+      {% else %}<b>{{ p.Precio|dinero }}</b>{% endif %}
+    </div>
+    {% if p.DescuentoUnitario > 0 %}<span class="etiqueta oferta" title="Promoción aplicada">{{ p.Promocion }}</span>{% endif %}
+    {% if p.Disponible and es_cliente %}
+      <form method="post" action="{{ url_for('tienda.carrito_agregar') }}">
+        {{ csrf_campo() }}
+        <input type="hidden" name="producto_id" value="{{ p.ProductoId }}">
+        <input type="hidden" name="volver" value="{{ request.full_path }}">
+        <button class="boton chico">Agregar al carrito</button>
+      </form>
+    {% elif p.Disponible %}
+      <div class="pie"><small class="tenue">{{ p.Existencia }} disponibles</small></div>
+    {% else %}
+      <div class="pie"><small class="tenue">Sin existencias por ahora</small></div>
+    {% endif %}
+  </div>
+</article>
+{% endmacro %}
+
+{% macro estado_pedido(nombre) %}<span class="etiqueta estado-{{ nombre|lower|replace(' ', '-')|replace('ó', 'o') }}">{{ nombre }}</span>{% endmacro %}
+
+{# Tabla genérica: columnas y filas tal como las devuelve el procedimiento almacenado. #}
+{% macro tabla(columnas, filas) %}
+<div class="tabla-envoltura">
+<table>
+  <thead><tr>{% for c in columnas %}<th class="{{ 'num' if filas and (es_decimal(filas[0][c]) or filas[0][c] is number) else '' }}">{{ c|titulo_columna }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for f in filas %}
+    <tr>{% for c in columnas %}<td class="{{ 'num' if es_decimal(f[c]) or f[c] is number else '' }}">{{ f[c]|celda }}</td>{% endfor %}</tr>
+  {% else %}
+    <tr><td colspan="{{ columnas|length or 1 }}" class="vacio">Sin resultados.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endmacro %}
+
+{% macro resumen_pedido(o, lineas) %}
+<table>
+  <thead><tr><th>SKU</th><th>Producto</th><th class="num">Cantidad</th><th class="num">Precio histórico</th><th class="num">Descuento</th><th class="num">Total</th></tr></thead>
+  <tbody>
+  {% for l in lineas %}
+    <tr>
+      <td>{{ l.SKU }}</td>
+      <td>{{ l.Nombre }}{% if l.Promocion %} <span class="etiqueta oferta">{{ l.Promocion }}</span>{% endif %}</td>
+      <td class="num">{{ l.Cantidad }}</td>
+      <td class="num">{{ l.PrecioUnitario|dinero }}</td>
+      <td class="num">{{ l.DescuentoUnitario|dinero if l.DescuentoUnitario else '—' }}</td>
+      <td class="num">{{ l.TotalLinea|dinero }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr><td colspan="5" class="num">Subtotal</td><td class="num">{{ o.Subtotal|dinero }}</td></tr>
+    <tr><td colspan="5" class="num">Descuentos</td><td class="num">− {{ o.DescuentoTotal|dinero }}</td></tr>
+    <tr><td colspan="5" class="num">Envío ({{ o.Zona }})</td><td class="num">{{ o.CostoEnvio|dinero }}</td></tr>
+    <tr class="total"><td colspan="5" class="num">Total</td><td class="num">{{ o.Total|dinero }}</td></tr>
+  </tfoot>
+</table>
+{% endmacro %}
+
+{% macro historial_tabla(historial) %}
+<table>
+  <thead><tr><th>Fecha y hora</th><th>De</th><th>A</th><th>Usuario</th><th>Comentario</th></tr></thead>
+  <tbody>
+  {% for h in historial %}
+    <tr><td>{{ h.Fecha|fecha_hora }}</td><td>{{ h.EstadoAnterior or '—' }}</td><td>{{ estado_pedido(h.EstadoNuevo) }}</td>
+        <td>{{ h.Usuario or h.UsuarioBD }}</td><td>{{ h.Comentario or '' }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}

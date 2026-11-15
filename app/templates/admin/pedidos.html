@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Pedidos{% endblock %}
+{% block contenido %}
+<h1>Pedidos <small class="tenue">({{ lista|length }})</small></h1>
+<section class="panel">
+  <form method="get" class="en-fila">
+    <select name="estado"><option value="">Todos los estados</option>
+      {% for e in estados %}<option value="{{ e.EstadoId }}" {{ 'selected' if request.args.get('estado') == e.EstadoId|string }}>{{ e.Nombre }}</option>{% endfor %}</select>
+    <label>Desde <input type="date" name="desde" value="{{ request.args.get('desde', '') }}"></label>
+    <label>Hasta <input type="date" name="hasta" value="{{ request.args.get('hasta', '') }}"></label>
+    <input type="search" name="q" placeholder="Cliente o correo" value="{{ request.args.get('q', '') }}">
+    <button class="boton secundario">Filtrar</button>
+    <a class="enlace" href="{{ url_for('admin.pedidos') }}">Limpiar</a>
+  </form>
+</section>
+<section class="panel">
+  <div class="tabla-envoltura">
+  <table>
+    <thead><tr><th>Pedido</th><th>Fecha</th><th>Estado</th><th>Cliente</th><th class="num">Líneas</th><th class="num">Unidades</th><th class="num">Total</th><th></th></tr></thead>
+    <tbody>
+    {% for o in lista %}
+      <tr>
+        <td><a href="{{ url_for('admin.pedido', pedido_id=o.PedidoId) }}">#{{ o.PedidoId }}</a></td>
+        <td>{{ o.FechaPedido|fecha_hora }}</td><td>{{ m.estado_pedido(o.Estado) }}</td>
+        <td>{{ o.Cliente }}<br><small class="tenue">{{ o.Correo }}</small></td>
+        <td class="num">{{ o.Lineas }}</td><td class="num">{{ o.Unidades }}</td><td class="num"><b>{{ o.Total|dinero }}</b></td>
+        <td><a href="{{ url_for('admin.pedido', pedido_id=o.PedidoId) }}">Gestionar</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" class="vacio">Sin resultados.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endblock %}

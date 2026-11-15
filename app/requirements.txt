@@ -1,0 +1,5 @@
+Flask>=3.0
+pyodbc>=5.1
+# Alternativa 100 % Python que la aplicación usa sola si pyodbc no se puede cargar
+# (por ejemplo, cuando Windows bloquea su DLL):
+pypyodbc>=1.3.6

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}TiendaTech{% endblock %} · TiendaTech</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body>
+<header class="barra">
+  <a class="marca" href="{{ url_for('tienda.catalogo') }}"><i></i><span>Tienda<b>Tech</b></span></a>
+  <form class="buscador" action="{{ url_for('tienda.catalogo') }}" method="get" role="search">
+    <input type="search" name="q" placeholder="Buscar productos, marcas o categorías" aria-label="Buscar en el catálogo"
+           value="{{ request.args.get('q', '') if request.endpoint == 'tienda.catalogo' else '' }}">
+    <button>Buscar</button>
+  </form>
+  <nav>
+    {% if es_admin %}
+      <a href="{{ url_for('tienda.catalogo') }}">Ver tienda</a>
+      <a href="{{ url_for('admin.panel') }}">Administración</a>
+    {% elif es_cliente %}
+      <a href="{{ url_for('tienda.pedidos') }}">Mis pedidos</a>
+      <a href="{{ url_for('tienda.perfil') }}">Mi perfil</a>
+      <a class="carrito" href="{{ url_for('tienda.carrito') }}">Carrito <span>{{ carrito_unidades }}</span></a>
+    {% endif %}
+    {% if session.uid %}
+      <span class="usuario" data-inicial="{{ session.nombre[:1] }}">{{ session.nombre }}</span>
+      <form method="post" action="{{ url_for('tienda.salir') }}" class="en-linea">
+        <input type="hidden" name="_csrf" value="{{ csrf() }}"><button class="enlace">Salir</button>
+      </form>
+    {% else %}
+      <a href="{{ url_for('tienda.login') }}">Ingresar</a>
+      <a class="boton-barra" href="{{ url_for('tienda.registro') }}">Crear cuenta</a>
+    {% endif %}
+  </nav>
+</header>
+
+{% macro enlace(destino, texto, prefijo) %}
+  <a href="{{ destino }}" class="{{ 'activo' if (prefijo == '/admin/' and request.path == '/admin/') or (prefijo != '/admin/' and request.path.startswith(prefijo)) }}">{{ texto }}</a>
+{% endmacro %}
+
+{% if es_admin and request.path.startswith('/admin') %}
+<div class="con-admin">
+  <nav class="lateral" aria-label="Administración">
+    <h3>General</h3>
+    {{ enlace(url_for('admin.panel'), 'Panel', '/admin/') }}
+    {{ enlace(url_for('reportes.indice'), 'Reportes', '/admin/reportes') }}
+    <h3>Catálogo</h3>
+    {{ enlace(url_for('admin.productos'), 'Productos', '/admin/productos') }}
+    {{ enlace(url_for('admin.simples', tipo='marcas'), 'Marcas', '/admin/marcas') }}
+    {{ enlace(url_for('admin.simples', tipo='categorias'), 'Categorías', '/admin/categorias') }}
+    {{ enlace(url_for('admin.promociones'), 'Promociones', '/admin/promociones') }}
+    <h3>Operación</h3>
+    {{ enlace(url_for('admin.pedidos'), 'Pedidos', '/admin/pedidos') }}
+    {{ enlace(url_for('admin.inventario'), 'Inventario', '/admin/inventario') }}
+    {{ enlace(url_for('admin.clientes'), 'Clientes', '/admin/clientes') }}
+    <h3>Control</h3>
+    {{ enlace(url_for('admin.auditoria'), 'Auditoría', '/admin/auditoria') }}
+  </nav>
+{% endif %}
+
+<main>
+  {% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% for categoria, mensaje in mensajes %}
+      <div class="aviso {{ categoria }}" role="status">{{ mensaje }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block contenido %}{% endblock %}
+</main>
+
+{% if es_admin and request.path.startswith('/admin') %}</div>{% endif %}
+
+<footer>TiendaTech · Proyecto Programado II de Bases de Datos · Microsoft SQL Server · datos ficticios</footer>
+</body>
+</html>

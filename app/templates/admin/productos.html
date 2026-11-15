@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Productos{% endblock %}
+{% block contenido %}
+<div class="encabezado">
+  <h1>Productos <small class="tenue">({{ lista|length }})</small></h1>
+  <a class="boton" href="{{ url_for('admin.producto_nuevo') }}">Nuevo producto</a>
+</div>
+<section class="panel">
+  <form method="get" class="en-fila">
+    <input type="search" name="q" placeholder="Nombre o SKU" value="{{ request.args.get('q', '') }}">
+    <select name="marca"><option value="">Todas las marcas</option>
+      {% for x in marcas %}<option value="{{ x.MarcaId }}" {{ 'selected' if request.args.get('marca') == x.MarcaId|string }}>{{ x.Nombre }}</option>{% endfor %}</select>
+    <select name="categoria"><option value="">Todas las categorías</option>
+      {% for x in categorias %}<option value="{{ x.CategoriaId }}" {{ 'selected' if request.args.get('categoria') == x.CategoriaId|string }}>{{ x.Nombre }}</option>{% endfor %}</select>
+    <select name="activo"><option value="">Todos los estados</option>
+      <option value="1" {{ 'selected' if request.args.get('activo') == '1' }}>Activos</option>
+      <option value="0" {{ 'selected' if request.args.get('activo') == '0' }}>Inactivos</option></select>
+    <button class="boton secundario">Filtrar</button>
+  </form>
+</section>
+<section class="panel">
+  <div class="tabla-envoltura">
+  <table>
+    <thead><tr><th>SKU</th><th>Nombre</th><th>Marca</th><th>Categoría</th><th class="num">Precio</th><th class="num">Costo</th>
+      <th class="num">Existencia</th><th class="num">Mínimo</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+    {% for p in lista %}
+      <tr class="{{ '' if p.Activo else 'inactivo' }}">
+        <td>{{ p.SKU }}</td>
+        <td><a href="{{ url_for('admin.producto_editar', producto_id=p.ProductoId) }}">{{ p.Nombre }}</a>{% if p.Destacado %} <span class="etiqueta oferta">Destacado</span>{% endif %}</td>
+        <td>{{ p.Marca }}</td><td>{{ p.Categoria }}</td>
+        <td class="num">{{ p.Precio|dinero }}</td><td class="num">{{ p.Costo|dinero }}</td>
+        <td class="num">{% if p.Existencia < p.StockMinimo %}<span class="etiqueta agotado">{{ p.Existencia }}</span>{% else %}{{ p.Existencia }}{% endif %}</td>
+        <td class="num">{{ p.StockMinimo }}</td>
+        <td>{{ 'Activo' if p.Activo else 'Inactivo' }}</td>
+        <td><a href="{{ url_for('admin.producto_editar', producto_id=p.ProductoId) }}">Editar</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="10" class="vacio">Sin resultados.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endblock %}

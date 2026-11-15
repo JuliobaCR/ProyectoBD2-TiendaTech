@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Finalizar compra{% endblock %}
+{% block contenido %}
+<h1>Finalizar compra</h1>
+<div class="con-resumen">
+  <div>
+    <section class="panel">
+      <h2>1. Dirección de entrega</h2>
+      {% if direcciones %}
+        {# Cambiar de dirección recarga la página para recalcular el envío según la zona. #}
+        <form method="get" class="formulario">
+          {% for d in direcciones %}
+            <label class="opcion">
+              <input type="radio" name="direccion" value="{{ d.DireccionId }}" {{ 'checked' if d.DireccionId == direccion_id }} onchange="this.form.submit()">
+              <span><b>{{ d.Alias }}</b> — {{ d.Detalle }}, {{ d.Distrito }}, {{ d.Canton }}, {{ d.Provincia }}<br>
+              <small class="tenue">{{ d.Zona }} · envío {{ d.Tarifa|dinero }} · {{ d.DiasEstimados }} días hábiles</small></span>
+            </label>
+          {% endfor %}
+          <noscript><button class="boton chico secundario">Recalcular envío</button></noscript>
+        </form>
+      {% else %}
+        <p class="aviso aviso">Todavía no tiene direcciones. <a href="{{ url_for('tienda.perfil') }}">Agregue una en su perfil</a> para poder comprar.</p>
+      {% endif %}
+    </section>
+
+    <form method="post" id="confirmar">
+      {{ m.csrf_campo() }}
+      <input type="hidden" name="direccion_id" value="{{ direccion_id or '' }}">
+      <section class="panel">
+        <h2>2. Forma de pago (simulada)</h2>
+        {% for mp in metodos %}
+          <label class="opcion">
+            <input type="radio" name="metodo_pago_id" value="{{ mp.MetodoPagoId }}" {{ 'checked' if loop.first }} required>
+            <span><b>{{ mp.Nombre }}</b><br>
+            <small class="tenue">{{ 'Aprobación inmediata: el pedido queda Confirmado.' if mp.AprobacionInmediata else 'El pedido queda Pendiente hasta que la tienda verifique el pago.' }}</small></span>
+          </label>
+        {% endfor %}
+      </section>
+    </form>
+
+    <section class="panel">
+      <h2>3. Productos</h2>
+      <table>
+        <thead><tr><th>Producto</th><th class="num">Cantidad</th><th class="num">Precio</th><th class="num">Total</th></tr></thead>
+        <tbody>
+        {% for l in lineas %}
+          <tr>
+            <td>{{ l.Nombre }}{% if l.Promocion %} <span class="etiqueta oferta">{{ l.Promocion }}</span>{% endif %}
+                {% if not l.Disponible %} <span class="etiqueta agotado">Existencia insuficiente ({{ l.Existencia }})</span>{% endif %}</td>
+            <td class="num">{{ l.Cantidad }}</td><td class="num">{{ l.PrecioFinal|dinero }}</td><td class="num">{{ l.TotalLinea|dinero }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </div>
+
+  <aside class="panel">
+    <h2>Resumen del pedido</h2>
+    <dl class="totales">
+      <dt>Subtotal ({{ resumen.Unidades }} unidades)</dt><dd>{{ resumen.Subtotal|dinero }}</dd>
+      <dt>Descuentos</dt><dd>− {{ resumen.Descuento|dinero }}</dd>
+      <dt>Envío{% if resumen.Zona %} ({{ resumen.Zona }}){% endif %}</dt><dd>{{ resumen.CostoEnvio|dinero }}</dd>
+      <dt class="total">Total a pagar</dt><dd class="total">{{ resumen.Total|dinero }}</dd>
+    </dl>
+    <button class="boton ancho" form="confirmar" {{ 'disabled' if not direccion_id }}>Confirmar pedido</button>
+    <p class="tenue">Al confirmar, SQL Server valida las existencias y registra todo en una sola transacción: si algo falla, no se guarda nada.</p>
+    <a class="enlace" href="{{ url_for('tienda.carrito') }}">Volver al carrito</a>
+  </aside>
+</div>
+{% endblock %}

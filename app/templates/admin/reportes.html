@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block titulo %}Reportes{% endblock %}
+{% block contenido %}
+<h1>Reportes y consultas analíticas</h1>
+<p class="tenue">Cada reporte ejecuta un procedimiento almacenado de <code>06_reportes.sql</code>. Los pedidos cancelados no cuentan como ventas
+  y los importes son los históricos guardados en el detalle del pedido. Todos se pueden exportar a CSV (se abre en Excel).</p>
+<div class="rejilla reportes">
+  {% for rid, r in reportes.items() %}
+    <a class="panel reporte" href="{{ url_for('reportes.ver', rid=rid) }}">
+      <b>{{ r.titulo }}</b>
+      <span>{{ r.nota }}</span>
+      <code>{{ r.sp }}</code>
+    </a>
+  {% endfor %}
+</div>
+{% endblock %}

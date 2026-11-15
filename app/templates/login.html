@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Ingresar{% endblock %}
+{% block contenido %}
+<section class="acceso">
+  <div class="lado">
+    <div><h2>Bienvenido de nuevo</h2><p>Ingrese para comprar, revisar sus pedidos o administrar la tienda.</p></div>
+    <ul><li>Carrito que se conserva entre sesiones</li><li>Seguimiento de cada pedido</li><li>Reseñas de lo que ya recibió</li></ul>
+  </div>
+  <div class="forma">
+  <h1>Ingresar</h1>
+  <form method="post" class="formulario">
+    {{ m.csrf_campo() }}
+    <label>Correo electrónico <input type="email" name="correo" required autofocus></label>
+    <label>Contraseña <input type="password" name="clave" required></label>
+    <button class="boton">Ingresar</button>
+  </form>
+  <p class="tenue">¿No tiene cuenta? <a href="{{ url_for('tienda.registro') }}">Crear cuenta de cliente</a></p>
+  <p class="tenue">Los usuarios de demostración (administrador y clientes) están en el README.</p>
+  </div>
+</section>
+{% endblock %}

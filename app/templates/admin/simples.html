@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}{{ cfg.titulo }}{% endblock %}
+{% block contenido %}
+<h1>{{ cfg.titulo }}</h1>
+<section class="panel">
+  <form method="get" class="en-fila">
+    <input type="search" name="q" placeholder="Buscar por nombre" value="{{ request.args.get('q', '') }}">
+    <select name="activo">
+      <option value="">Todos los estados</option>
+      <option value="1" {{ 'selected' if request.args.get('activo') == '1' }}>Activos</option>
+      <option value="0" {{ 'selected' if request.args.get('activo') == '0' }}>Inactivos</option>
+    </select>
+    <button class="boton secundario">Filtrar</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Nueva {{ cfg.singular }}</h2>
+  <form method="post" class="en-fila">
+    {{ m.csrf_campo() }}
+    <input name="nombre" placeholder="Nombre" required maxlength="60">
+    <input name="extra" placeholder="{{ cfg.extra_etiqueta }}" class="largo" maxlength="250">
+    <button class="boton">Crear</button>
+  </form>
+</section>
+
+<section class="panel">
+  <table>
+    <thead><tr><th>Id</th><th>Nombre</th><th>{{ cfg.extra_etiqueta }}</th><th>Activo</th><th class="num">Productos</th><th></th><th></th></tr></thead>
+    <tbody>
+    {% for x in lista %}
+      <tr class="{{ '' if x.Activo else 'inactivo' }}">
+        <td>{{ x[cfg.id] }}</td>
+        <td><input form="f{{ x[cfg.id] }}" name="nombre" value="{{ x.Nombre }}" required maxlength="60"></td>
+        <td><input form="f{{ x[cfg.id] }}" name="extra" value="{{ x[cfg.extra] or '' }}" class="largo" maxlength="250"></td>
+        <td><input form="f{{ x[cfg.id] }}" type="checkbox" name="activo" value="1" {{ 'checked' if x.Activo }}></td>
+        <td class="num">{{ x.Productos }}</td>
+        <td>
+          <form method="post" id="f{{ x[cfg.id] }}">{{ m.csrf_campo() }}<input type="hidden" name="id" value="{{ x[cfg.id] }}">
+            <button class="boton chico secundario">Guardar</button></form>
+        </td>
+        <td>
+          <form method="post">{{ m.csrf_campo() }}<input type="hidden" name="id" value="{{ x[cfg.id] }}"><input type="hidden" name="accion" value="eliminar">
+            <button class="enlace peligro" title="Solo se elimina si no tiene productos; si los tiene, desactívela">Eliminar</button></form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="vacio">Sin resultados.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="tenue">Para desactivar, quite la marca de «Activo» y guarde. Un registro con productos no se puede eliminar: la base de datos lo impide.</p>
+</section>
+{% endblock %}

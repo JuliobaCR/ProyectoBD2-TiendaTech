@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Crear cuenta{% endblock %}
+{% block contenido %}
+<section class="acceso">
+  <div class="lado">
+    <div><h2>Cree su cuenta en un minuto</h2><p>Solo necesitamos sus datos básicos. Su contraseña se guarda cifrada con hash.</p></div>
+    <ul><li>Carrito que se conserva entre sesiones</li><li>Seguimiento de cada pedido</li><li>Reseñas de lo que ya recibió</li></ul>
+  </div>
+  <div class="forma">
+  <h1>Crear cuenta de cliente</h1>
+  <form method="post" class="formulario">
+    {{ m.csrf_campo() }}
+    <div class="dos">
+      <label>Nombre <input name="nombre" value="{{ f.get('nombre', '') }}" required maxlength="60"></label>
+      <label>Apellidos <input name="apellidos" value="{{ f.get('apellidos', '') }}" required maxlength="80"></label>
+    </div>
+    <div class="dos">
+      <label>Identificación <input name="identificacion" value="{{ f.get('identificacion', '') }}" required maxlength="20"></label>
+      <label>Teléfono <input name="telefono" value="{{ f.get('telefono', '') }}" maxlength="20"></label>
+    </div>
+    <label>Correo electrónico <input type="email" name="correo" value="{{ f.get('correo', '') }}" required maxlength="120"></label>
+    <div class="dos">
+      <label>Contraseña (mínimo 8) <input type="password" name="clave" required minlength="8"></label>
+      <label>Repetir contraseña <input type="password" name="clave2" required minlength="8"></label>
+    </div>
+    <button class="boton">Crear cuenta</button>
+  </form>
+  </div>
+</section>
+{% endblock %}

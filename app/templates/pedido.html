@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Pedido #{{ o.PedidoId }}{% endblock %}
+{% block contenido %}
+<p class="migas"><a href="{{ url_for('tienda.pedidos') }}">Mis pedidos</a> › Pedido #{{ o.PedidoId }}</p>
+<div class="encabezado">
+  <h1>Pedido #{{ o.PedidoId }} {{ m.estado_pedido(o.Estado) }}</h1>
+  <a class="boton secundario" href="{{ url_for('tienda.pedido_imprimir', pedido_id=o.PedidoId) }}" target="_blank">Imprimir / guardar PDF</a>
+</div>
+
+<div class="tres">
+  <section class="panel"><h3>Compra</h3>
+    <p>{{ o.FechaPedido|fecha_hora }}<br>{{ o.Lineas }} producto(s), {{ o.Unidades }} unidad(es)</p></section>
+  <section class="panel"><h3>Entrega</h3>
+    <p><b>{{ o.DireccionAlias }}</b>: {{ o.DireccionDetalle }}, {{ o.Distrito }}, {{ o.Canton }}, {{ o.Provincia }}<br>
+    {% if o.NumeroGuia %}Guía {{ o.NumeroGuia }} · despachado {{ o.FechaDespacho|fecha_hora }}{% else %}Aún sin despachar{% endif %}
+    {% if o.FechaEntrega %}<br>Entregado {{ o.FechaEntrega|fecha_hora }}{% endif %}</p></section>
+  <section class="panel"><h3>Pago (simulado)</h3>
+    <p>{{ o.MetodoPago }}<br>{{ o.MontoPago|dinero }} · <b>{{ o.EstadoPago }}</b><br><small class="tenue">Ref. {{ o.ReferenciaPago }}</small></p></section>
+</div>
+
+<section class="panel">
+  <h2>Detalle</h2>
+  {{ m.resumen_pedido(o, lineas) }}
+  <p class="tenue">Los precios mostrados son los del momento de la compra; no cambian aunque cambie el catálogo.</p>
+</section>
+
+<section class="panel">
+  <h2>Historial de estados</h2>
+  {{ m.historial_tabla(historial) }}
+</section>
+
+{% if o.Cancelable %}
+<section class="panel">
+  <h2>Cancelar pedido</h2>
+  <p class="tenue">Puede cancelar mientras el pedido no haya sido enviado. Las existencias se reintegran al inventario.</p>
+  <form method="post" action="{{ url_for('tienda.pedido_cancelar', pedido_id=o.PedidoId) }}" class="en-fila">
+    {{ m.csrf_campo() }}
+    <input name="motivo" placeholder="Motivo de la cancelación" required maxlength="180" class="largo">
+    <button class="boton peligro">Cancelar pedido</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

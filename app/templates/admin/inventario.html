@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Inventario{% endblock %}
+{% block contenido %}
+<div class="encabezado">
+  <h1>Inventario</h1>
+  <a class="boton secundario" href="{{ url_for('admin.conciliacion') }}">Conciliación completa</a>
+</div>
+
+{% if diferencias %}
+  <div class="aviso error">Hay {{ diferencias|length }} producto(s) cuya existencia no coincide con sus movimientos. Revise la conciliación.</div>
+{% else %}
+  <div class="aviso ok">Inventario conciliado: la existencia de cada producto es igual a la suma de sus movimientos.</div>
+{% endif %}
+
+<div class="dos-columnas">
+  <section class="panel">
+    <h2>Registrar movimiento</h2>
+    <form method="post" class="formulario">
+      {{ m.csrf_campo() }}
+      <label>Producto
+        <select name="producto_id" required>
+          <option value="">Seleccione…</option>
+          {% for p in productos %}<option value="{{ p.ProductoId }}" {{ 'selected' if request.args.get('producto') == p.ProductoId|string }}>{{ p.SKU }} · {{ p.Nombre }} (existencia {{ p.Existencia }})</option>{% endfor %}
+        </select>
+      </label>
+      <div class="dos">
+        <label>Tipo
+          <select name="tipo" required>
+            <option value="ENTRADA">Entrada (compra, devolución)</option>
+            <option value="SALIDA">Salida (merma, uso interno)</option>
+            <option value="AJUSTE">Ajuste (positivo o negativo)</option>
+          </select>
+        </label>
+        <label>Cantidad <input type="number" name="cantidad" required placeholder="En ajustes puede ser negativa"></label>
+      </div>
+      <label>Motivo <input name="motivo" required maxlength="200" placeholder="Factura, conteo físico, daño…"></label>
+      <button class="boton">Registrar</button>
+    </form>
+  </section>
+  <section class="panel">
+    <h2>Bajo el mínimo <span class="etiqueta agotado">{{ bajo_minimo|length }}</span></h2>
+    <table>
+      <thead><tr><th>Producto</th><th class="num">Existencia</th><th class="num">Mínimo</th><th class="num">Faltan</th></tr></thead>
+      <tbody>
+      {% for b in bajo_minimo %}
+        <tr><td>{{ b.SKU }} · {{ b.Nombre }}</td><td class="num">{{ b.Existencia }}</td><td class="num">{{ b.StockMinimo }}</td><td class="num"><b>{{ b.Faltante }}</b></td></tr>
+      {% else %}
+        <tr><td colspan="4" class="vacio">Ningún producto bajo el mínimo.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<section class="panel">
+  <h2>Movimientos <small class="tenue">({{ movimientos|length }}{{ ', máximo 500' if movimientos|length == 500 }})</small></h2>
+  <form method="get" class="en-fila">
+    <select name="producto"><option value="">Todos los productos</option>
+      {% for p in productos %}<option value="{{ p.ProductoId }}" {{ 'selected' if request.args.get('producto') == p.ProductoId|string }}>{{ p.SKU }} · {{ p.Nombre }}</option>{% endfor %}</select>
+    <select name="tipo"><option value="">Todos los tipos</option>
+      {% for t in ['ENTRADA', 'SALIDA', 'AJUSTE'] %}<option {{ 'selected' if request.args.get('tipo') == t }}>{{ t }}</option>{% endfor %}</select>
+    <label>Desde <input type="date" name="desde" value="{{ request.args.get('desde', '') }}"></label>
+    <label>Hasta <input type="date" name="hasta" value="{{ request.args.get('hasta', '') }}"></label>
+    <button class="boton secundario">Filtrar</button>
+  </form>
+  <div class="tabla-envoltura">
+  <table>
+    <thead><tr><th>#</th><th>Fecha</th><th>Producto</th><th>Tipo</th><th class="num">Cantidad</th><th class="num">Existencia resultante</th><th>Usuario</th><th>Motivo</th></tr></thead>
+    <tbody>
+    {% for x in movimientos %}
+      <tr><td>{{ x.MovimientoId }}</td><td>{{ x.Fecha|fecha_hora }}</td><td>{{ x.SKU }} · {{ x.Producto }}</td>
+          <td><span class="etiqueta mov-{{ x.Tipo|lower }}">{{ x.Tipo }}</span></td>
+          <td class="num">{{ '%+d'|format(x.Cantidad) }}</td><td class="num">{{ x.ExistenciaResultante }}</td>
+          <td>{{ x.Usuario }}</td>
+          <td>{{ x.Motivo }}{% if x.PedidoId %} <a href="{{ url_for('admin.pedido', pedido_id=x.PedidoId) }}">ver pedido</a>{% endif %}</td></tr>
+    {% else %}
+      <tr><td colspan="8" class="vacio">Sin movimientos.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endblock %}

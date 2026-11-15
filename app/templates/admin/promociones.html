@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Promociones{% endblock %}
+{% block contenido %}
+<h1>Promociones</h1>
+<p class="tenue">Regla de combinación: las promociones no se acumulan. Si un producto está en varias promociones vigentes,
+  se aplica solo la de mayor descuento, y el descuento nunca supera el precio.</p>
+
+<section class="panel">
+  <details>
+    <summary><b>+ Nueva promoción</b></summary>
+    <form method="post" class="formulario">
+      {{ m.csrf_campo() }}
+      <div class="tres-campos">
+        <label>Nombre <input name="nombre" required maxlength="80"></label>
+        <label>Tipo <select name="tipo"><option value="P">Porcentaje (%)</option><option value="M">Monto fijo (₡)</option></select></label>
+        <label>Valor <input type="number" name="valor" min="0.01" step="0.01" required></label>
+      </div>
+      <div class="dos">
+        <label>Inicio <input type="date" name="inicio" required></label>
+        <label>Fin <input type="date" name="fin" required></label>
+      </div>
+      <button class="boton">Crear promoción</button>
+    </form>
+  </details>
+</section>
+
+<section class="panel">
+  <div class="tabla-envoltura">
+  <table>
+    <thead><tr><th>Nombre</th><th>Tipo</th><th>Valor</th><th>Inicio</th><th>Fin</th><th>Activa</th><th>Vigencia</th><th class="num">Productos</th><th></th></tr></thead>
+    <tbody>
+    {% for x in lista %}
+      <tr class="{{ 'seleccionada' if x.PromocionId == seleccion }}">
+        <td><input form="p{{ x.PromocionId }}" name="nombre" value="{{ x.Nombre }}" required maxlength="80"></td>
+        <td><select form="p{{ x.PromocionId }}" name="tipo"><option value="P" {{ 'selected' if x.TipoDescuento == 'P' }}>%</option><option value="M" {{ 'selected' if x.TipoDescuento == 'M' }}>₡</option></select></td>
+        <td><input form="p{{ x.PromocionId }}" type="number" name="valor" value="{{ x.Valor }}" min="0.01" step="0.01" required class="medio"></td>
+        <td><input form="p{{ x.PromocionId }}" type="date" name="inicio" value="{{ x.FechaInicio }}" required></td>
+        <td><input form="p{{ x.PromocionId }}" type="date" name="fin" value="{{ x.FechaFin }}" required></td>
+        <td><input form="p{{ x.PromocionId }}" type="checkbox" name="activo" value="1" {{ 'checked' if x.Activo }}></td>
+        <td><span class="etiqueta vigencia-{{ x.Vigencia|lower }}">{{ x.Vigencia }}</span></td>
+        <td class="num"><a href="{{ url_for('admin.promociones', ver=x.PromocionId) }}#productos">{{ x.Productos }} · ver</a></td>
+        <td><form method="post" id="p{{ x.PromocionId }}">{{ m.csrf_campo() }}<input type="hidden" name="id" value="{{ x.PromocionId }}">
+          <button class="boton chico secundario">Guardar</button></form></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+{% if seleccion %}
+<section class="panel" id="productos">
+  <h2>Productos de la promoción #{{ seleccion }}</h2>
+  <div class="dos-columnas">
+    <form method="post" class="en-fila">
+      {{ m.csrf_campo() }}<input type="hidden" name="id" value="{{ seleccion }}"><input type="hidden" name="accion" value="categoria">
+      <select name="categoria_id" required>{% for c in categorias %}<option value="{{ c.CategoriaId }}">{{ c.Nombre }}</option>{% endfor %}</select>
+      <button class="boton chico secundario">Agregar toda la categoría</button>
+    </form>
+    <form method="post" class="en-fila">
+      {{ m.csrf_campo() }}<input type="hidden" name="id" value="{{ seleccion }}"><input type="hidden" name="accion" value="producto">
+      <select name="producto_id" required>{% for p in productos %}<option value="{{ p.ProductoId }}">{{ p.Nombre }}</option>{% endfor %}</select>
+      <button class="boton chico secundario">Agregar producto</button>
+    </form>
+  </div>
+  <table>
+    <thead><tr><th>SKU</th><th>Producto</th><th>Categoría</th><th class="num">Precio</th><th></th></tr></thead>
+    <tbody>
+    {% for p in productos_promo %}
+      <tr><td>{{ p.SKU }}</td><td>{{ p.Nombre }}</td><td>{{ p.Categoria }}</td><td class="num">{{ p.Precio|dinero }}</td>
+        <td><form method="post">{{ m.csrf_campo() }}<input type="hidden" name="id" value="{{ seleccion }}"><input type="hidden" name="accion" value="quitar">
+          <input type="hidden" name="producto_id" value="{{ p.ProductoId }}"><button class="enlace peligro">Quitar</button></form></td></tr>
+    {% else %}
+      <tr><td colspan="5" class="vacio">La promoción todavía no tiene productos.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

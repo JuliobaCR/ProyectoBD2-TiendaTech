@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block titulo %}Conciliación de inventario{% endblock %}
+{% block contenido %}
+<p class="migas"><a href="{{ url_for('admin.inventario') }}">Inventario</a> › Conciliación</p>
+<h1>Conciliación de inventario</h1>
+<p class="tenue">Existencia = entradas − salidas ± ajustes. La columna «Diferencia» debe ser 0 en todos los productos.</p>
+<section class="panel">
+  <div class="tabla-envoltura">
+  <table>
+    <thead><tr><th>SKU</th><th>Producto</th><th class="num">Entradas</th><th class="num">Salidas</th><th class="num">Ajustes</th>
+      <th class="num">Saldo de movimientos</th><th class="num">Existencia</th><th class="num">Diferencia</th></tr></thead>
+    <tbody>
+    {% for x in lista %}
+      <tr><td>{{ x.SKU }}</td><td>{{ x.Nombre }}</td><td class="num">{{ x.Entradas }}</td><td class="num">{{ x.Salidas }}</td>
+          <td class="num">{{ x.Ajustes }}</td><td class="num">{{ x.SaldoMovimientos }}</td><td class="num"><b>{{ x.Existencia }}</b></td>
+          <td class="num">{% if x.Diferencia %}<span class="etiqueta agotado">{{ x.Diferencia }}</span>{% else %}0{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endblock %}

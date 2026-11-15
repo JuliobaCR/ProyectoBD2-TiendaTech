@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Panel{% endblock %}
+{% block contenido %}
+<h1>Panel de administración</h1>
+<div class="indicadores">
+  <div class="panel destacado"><small>Ventas (sin cancelados)</small><b>{{ r.VentasTotales|dinero }}</b></div>
+  <div class="panel"><small>Pedidos vendidos</small><b>{{ r.PedidosVendidos }}</b></div>
+  <div class="panel"><small>Ticket promedio</small><b>{{ r.TicketPromedio|dinero }}</b></div>
+  <div class="panel"><small>Pendientes de pago</small><b>{{ r.PedidosPendientes }}</b></div>
+  <div class="panel"><small>En proceso</small><b>{{ r.PedidosEnProceso }}</b></div>
+  <div class="panel"><small>Clientes activos</small><b>{{ r.ClientesActivos }}</b></div>
+  <div class="panel"><small>Productos activos</small><b>{{ r.ProductosActivos }}</b></div>
+  <div class="panel"><small>Promociones vigentes</small><b>{{ r.PromocionesVigentes }}</b></div>
+</div>
+
+<div class="dos-columnas">
+  <section class="panel">
+    <h2>Alerta: productos bajo el mínimo <span class="etiqueta agotado">{{ bajo_minimo|length }}</span></h2>
+    <table>
+      <thead><tr><th>SKU</th><th>Producto</th><th class="num">Existencia</th><th class="num">Mínimo</th><th class="num">Faltan</th></tr></thead>
+      <tbody>
+      {% for b in bajo_minimo %}
+        <tr><td class="fijo">{{ b.SKU }}</td><td><a href="{{ url_for('admin.producto_editar', producto_id=b.ProductoId) }}">{{ b.Nombre }}</a></td>
+            <td class="num">{{ b.Existencia }}</td><td class="num">{{ b.StockMinimo }}</td><td class="num"><b>{{ b.Faltante }}</b></td></tr>
+      {% else %}
+        <tr><td colspan="5" class="vacio">Ningún producto está bajo el mínimo.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p><a href="{{ url_for('admin.inventario') }}">Registrar entrada de inventario</a> · <a href="{{ url_for('reportes.ver', rid='r6') }}">Ver reporte R6</a></p>
+  </section>
+  <section class="panel">
+    <h2>Pedidos por estado</h2>
+    <table>
+      <thead><tr><th>Estado</th><th class="num">Pedidos</th><th class="num">Monto</th></tr></thead>
+      <tbody>
+      {% for e in por_estado %}
+        <tr><td><a href="{{ url_for('admin.pedidos', estado=e.EstadoId) }}">{{ m.estado_pedido(e.Estado) }}</a></td>
+            <td class="num">{{ e.Pedidos }}</td><td class="num">{{ e.MontoTotal|dinero }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Pedido #{{ o.PedidoId }}{% endblock %}
+{% block contenido %}
+<p class="migas"><a href="{{ url_for('admin.pedidos') }}">Pedidos</a> › Pedido #{{ o.PedidoId }}</p>
+<div class="encabezado">
+  <h1>Pedido #{{ o.PedidoId }} {{ m.estado_pedido(o.Estado) }}</h1>
+  <a class="boton secundario" href="{{ url_for('tienda.pedido_imprimir', pedido_id=o.PedidoId) }}" target="_blank">Imprimir / guardar PDF</a>
+</div>
+
+<div class="tres">
+  <section class="panel"><h3>Cliente</h3><p>{{ o.Cliente }}<br>{{ o.Correo }}<br>{{ o.Identificacion }}{% if o.Telefono %} · Tel. {{ o.Telefono }}{% endif %}<br>
+    <small class="tenue">Pedido del {{ o.FechaPedido|fecha_hora }}</small></p></section>
+  <section class="panel"><h3>Entrega</h3><p>{{ o.DireccionDetalle }}, {{ o.Distrito }}, {{ o.Canton }}, {{ o.Provincia }}<br>
+    {{ o.Zona }} · {{ o.DiasEstimados }} días<br>
+    {% if o.NumeroGuia %}Guía <b>{{ o.NumeroGuia }}</b> · despacho {{ o.FechaDespacho|fecha_hora }}{% else %}Sin despachar{% endif %}
+    {% if o.FechaEntrega %}<br>Entregado {{ o.FechaEntrega|fecha_hora }}{% endif %}</p></section>
+  <section class="panel"><h3>Pago simulado</h3><p>{{ o.MetodoPago }}<br>{{ o.MontoPago|dinero }} · <b>{{ o.EstadoPago }}</b><br>
+    <small class="tenue">Ref. {{ o.ReferenciaPago }}</small></p></section>
+</div>
+
+<div class="dos-columnas">
+  <section class="panel">
+    <h2>Cambiar estado</h2>
+    <p class="tenue">La lista completa permite probar transiciones inválidas: SQL Server las rechaza.
+      Válidas desde «{{ o.Estado }}»: {% for t in transiciones %}<b>{{ t.Nombre }}</b>{{ ', ' if not loop.last }}{% else %}ninguna (estado final){% endfor %}.</p>
+    <form method="post" class="formulario">
+      {{ m.csrf_campo() }}
+      <label>Nuevo estado
+        <select name="estado_id" required>
+          {% for e in estados if e.EstadoId != 6 %}<option value="{{ e.EstadoId }}" {{ 'selected' if transiciones and transiciones[0].EstadoId == e.EstadoId }}>{{ e.Nombre }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Comentario (opcional) <input name="comentario" maxlength="240"></label>
+      <button class="boton">Cambiar estado</button>
+    </form>
+  </section>
+  <section class="panel">
+    <h2>Cancelar pedido</h2>
+    <p class="tenue">Solo antes del envío. Reintegra las existencias una única vez y reembolsa o anula el pago simulado.</p>
+    <form method="post" class="formulario">
+      {{ m.csrf_campo() }}<input type="hidden" name="accion" value="cancelar">
+      <label>Motivo <input name="motivo" required maxlength="180"></label>
+      <button class="boton peligro">Cancelar pedido</button>
+    </form>
+  </section>
+</div>
+
+<section class="panel">
+  <h2>Detalle</h2>
+  {{ m.resumen_pedido(o, lineas) }}
+</section>
+<section class="panel">
+  <h2>Historial de estados <small class="tenue">(lo registra el trigger TR_Pedido_HistorialEstado)</small></h2>
+  {{ m.historial_tabla(historial) }}
+</section>
+{% endblock %}

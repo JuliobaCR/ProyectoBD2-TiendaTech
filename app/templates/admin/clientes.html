@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Clientes{% endblock %}
+{% block contenido %}
+<h1>Clientes <small class="tenue">({{ lista|length }})</small></h1>
+<section class="panel">
+  <form method="get" class="en-fila">
+    <input type="search" name="q" placeholder="Nombre, correo o identificación" class="largo" value="{{ request.args.get('q', '') }}">
+    <select name="activo"><option value="">Todos los estados</option>
+      <option value="1" {{ 'selected' if request.args.get('activo') == '1' }}>Activos</option>
+      <option value="0" {{ 'selected' if request.args.get('activo') == '0' }}>Inactivos</option></select>
+    <button class="boton secundario">Filtrar</button>
+  </form>
+</section>
+
+<section class="panel">
+  <details>
+    <summary><b>+ Nuevo cliente</b></summary>
+    <form method="post" class="formulario">
+      {{ m.csrf_campo() }}
+      <div class="tres-campos">
+        <label>Nombre <input name="nombre" required maxlength="60"></label>
+        <label>Apellidos <input name="apellidos" required maxlength="80"></label>
+        <label>Identificación <input name="identificacion" required maxlength="20"></label>
+      </div>
+      <div class="tres-campos">
+        <label>Correo <input type="email" name="correo" required maxlength="120"></label>
+        <label>Teléfono <input name="telefono" maxlength="20"></label>
+        <label>Contraseña temporal (mínimo 8) <input type="password" name="clave" required minlength="8"></label>
+      </div>
+      <button class="boton">Crear cliente</button>
+    </form>
+  </details>
+</section>
+
+<section class="panel">
+  <div class="tabla-envoltura">
+  <table>
+    <thead><tr><th>Nombre</th><th>Apellidos</th><th>Identificación</th><th>Teléfono</th><th>Correo</th><th class="num">Pedidos</th><th></th><th>Estado</th></tr></thead>
+    <tbody>
+    {% for c in lista %}
+      <tr class="{{ '' if c.Activo else 'inactivo' }}">
+        <td><input form="c{{ c.ClienteId }}" name="nombre" value="{{ c.Nombre }}" required maxlength="60"></td>
+        <td><input form="c{{ c.ClienteId }}" name="apellidos" value="{{ c.Apellidos }}" required maxlength="80"></td>
+        <td><input form="c{{ c.ClienteId }}" name="identificacion" value="{{ c.Identificacion }}" required maxlength="20" class="medio"></td>
+        <td><input form="c{{ c.ClienteId }}" name="telefono" value="{{ c.Telefono or '' }}" maxlength="20" class="medio"></td>
+        <td>{{ c.Correo }}</td>
+        <td class="num"><a href="{{ url_for('admin.pedidos', q=c.Correo) }}">{{ c.Pedidos }}</a></td>
+        <td><form method="post" id="c{{ c.ClienteId }}">{{ m.csrf_campo() }}<input type="hidden" name="id" value="{{ c.ClienteId }}">
+          <button class="boton chico secundario">Guardar</button></form></td>
+        <td><form method="post">{{ m.csrf_campo() }}<input type="hidden" name="id" value="{{ c.ClienteId }}"><input type="hidden" name="accion" value="estado">
+          {% if c.Activo %}<button class="enlace peligro">Desactivar</button>
+          {% else %}<input type="hidden" name="activo" value="1"><button class="enlace">Reactivar</button>{% endif %}</form></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="8" class="vacio">Sin resultados.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="tenue">Los clientes no se eliminan (tienen historial de pedidos): se desactivan y ya no pueden ingresar.</p>
+</section>
+{% endblock %}

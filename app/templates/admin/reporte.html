@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}{{ cfg.titulo }}{% endblock %}
+{% block contenido %}
+<p class="migas"><a href="{{ url_for('reportes.indice') }}">Reportes</a> ›
+  {% for otro, r in reportes.items() %}<a href="{{ url_for('reportes.ver', rid=otro) }}" class="{{ 'actual' if otro == rid }}">{{ otro|upper }}</a>{{ ' · ' if not loop.last }}{% endfor %}</p>
+<div class="encabezado">
+  <h1>{{ cfg.titulo }}</h1>
+  <a class="boton secundario" href="{{ url_for('reportes.exportar', rid=rid) }}{{ '?' + consulta if consulta }}">Exportar a CSV / Excel</a>
+</div>
+<p class="tenue">{{ cfg.nota }} Procedimiento: <code>dbo.{{ cfg.sp }}</code></p>
+
+<section class="panel">
+  <form method="get" class="en-fila">
+    {% for nombre, tipo, etiqueta, defecto in cfg.params %}
+      <label>{{ etiqueta }}
+        {% if tipo == 'fecha' %}<input type="date" name="{{ nombre }}" value="{{ valores.get(nombre) or '' }}">
+        {% elif tipo == 'anio' %}<input type="number" name="{{ nombre }}" value="{{ valores.get(nombre) or defecto }}" min="2000" max="2100" class="medio">
+        {% elif tipo == 'entero' %}<input type="number" name="{{ nombre }}" value="{{ valores.get(nombre) or defecto }}" min="1" class="medio">
+        {% elif tipo == 'texto' %}<input type="search" name="{{ nombre }}" value="{{ valores.get(nombre) or '' }}">
+        {% elif tipo == 'estado' %}
+          <select name="{{ nombre }}"><option value="">Todos</option>
+            {% for e in estados %}<option value="{{ e.EstadoId }}" {{ 'selected' if valores.get(nombre) == e.EstadoId }}>{{ e.Nombre }}</option>{% endfor %}</select>
+        {% else %}
+          <select name="{{ nombre }}">{% for codigo, texto in tipo %}<option value="{{ codigo }}" {{ 'selected' if valores.get(nombre) == codigo }}>{{ texto }}</option>{% endfor %}</select>
+        {% endif %}
+      </label>
+    {% endfor %}
+    <button class="boton">Consultar</button>
+  </form>
+</section>
+
+{% if grafico %}
+<section class="panel">
+  <h2>Gráfico: {{ grafico.titulo }}</h2>
+  <div class="grafico">
+    {% for etiqueta, valor, ancho in grafico.puntos %}
+      <div class="fila-grafico">
+        <span class="etiqueta-grafico" title="{{ etiqueta }}">{{ etiqueta }}</span>
+        <span class="pista"><span class="barra-grafico {{ 'negativa' if valor < 0 }}" style="width: {{ ancho }}%"></span></span>
+        <span class="valor-grafico">{{ '{:,.0f}'.format(valor).replace(',', ' ') }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Resultado <small class="tenue">({{ filas|length }} filas)</small></h2>
+  {{ m.tabla(columnas, filas) }}
+</section>
+{% endblock %}

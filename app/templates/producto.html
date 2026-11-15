@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}{{ p.Nombre }}{% endblock %}
+{% block contenido %}
+<p class="migas"><a href="{{ url_for('tienda.catalogo') }}">Catálogo</a> › <a href="{{ url_for('tienda.catalogo', categoria=p.CategoriaId) }}">{{ p.Categoria }}</a> › {{ p.Nombre }}</p>
+<section class="panel detalle">
+  <div class="galeria">
+    <img src="{{ p.ImagenUrl or url_for('static', filename='img/sin-imagen.svg') }}" alt="{{ p.Nombre }}">
+    {% if imagenes|length > 1 %}
+      <div class="miniaturas">{% for i in imagenes %}<img src="{{ i.Url }}" alt="Imagen {{ loop.index }}">{% endfor %}</div>
+    {% endif %}
+  </div>
+  <div>
+    <small>{{ p.Marca }} · SKU {{ p.SKU }}</small>
+    <h1>{{ p.Nombre }}</h1>
+    <div>
+      {% if p.TotalResenas %}{{ m.estrellas(p.CalificacionPromedio) }} <b>{{ p.CalificacionPromedio }}</b> de 5 · {{ p.TotalResenas }} reseña(s)
+      {% else %}<span class="tenue">Aún sin reseñas</span>{% endif %}
+    </div>
+    <div class="precio grande">
+      {% if p.DescuentoUnitario > 0 %}
+        <s>{{ p.Precio|dinero }}</s> <b>{{ p.PrecioFinal|dinero }}</b>
+        <span class="etiqueta oferta">{{ p.Promocion }}: ahorra {{ p.DescuentoUnitario|dinero }}</span>
+      {% else %}<b>{{ p.Precio|dinero }}</b>{% endif %}
+    </div>
+    <p>{{ p.Descripcion or '' }}</p>
+    <p>
+      {% if p.Disponible %}<span class="etiqueta disponible">Disponible</span> {{ p.Existencia }} unidades en existencia
+      {% else %}<span class="etiqueta agotado">Agotado</span>{% endif %}
+    </p>
+    {% if p.Disponible and es_cliente %}
+      <form method="post" action="{{ url_for('tienda.carrito_agregar') }}" class="en-fila">
+        {{ m.csrf_campo() }}
+        <input type="hidden" name="producto_id" value="{{ p.ProductoId }}">
+        <input type="hidden" name="volver" value="{{ request.path }}">
+        <label>Cantidad <input type="number" name="cantidad" value="1" min="1" max="{{ p.Existencia }}" required></label>
+        <button class="boton">Agregar al carrito</button>
+      </form>
+    {% elif not session.uid %}
+      <p><a class="boton" href="{{ url_for('tienda.login', siguiente=request.path) }}">Ingrese para comprar</a></p>
+    {% endif %}
+    {% if p.Especificaciones %}
+      <h3>Especificaciones</h3>
+      <ul class="especificaciones">{% for e in p.Especificaciones.split(';') %}<li>{{ e.strip() }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Reseñas</h2>
+  {% if es_cliente and estado_resena %}
+    {% if estado_resena.ComproYRecibio %}
+      <form method="post" action="{{ url_for('tienda.guardar_resena', producto_id=p.ProductoId) }}" class="formulario caja">
+        {{ m.csrf_campo() }}
+        <input type="hidden" name="resena_id" value="{{ estado_resena.ResenaId or '' }}">
+        <b>{{ 'Editar mi reseña' if estado_resena.ResenaId else 'Escribir una reseña' }}</b>
+        <label>Calificación
+          <select name="calificacion" required>
+            {% for n in [5, 4, 3, 2, 1] %}<option value="{{ n }}" {{ 'selected' if estado_resena.Calificacion == n }}>{{ n }} — {{ '★' * n }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Comentario <textarea name="comentario" maxlength="500" rows="3">{{ estado_resena.Comentario or '' }}</textarea></label>
+        <button class="boton">Guardar reseña</button>
+      </form>
+    {% else %}
+      <p class="tenue">Podrá reseñar este producto cuando lo haya comprado y recibido.</p>
+    {% endif %}
+  {% endif %}
+  {% for r in resenas %}
+    <article class="resena">
+      <div>{{ m.estrellas(r.Calificacion) }} <b>{{ r.Cliente }}</b> <small class="tenue">{{ r.Fecha|solo_fecha }}</small></div>
+      <p>{{ r.Comentario or '' }}</p>
+      {% if es_admin or (es_cliente and r.ClienteId == session.cid) %}
+        <form method="post" action="{{ url_for('tienda.eliminar_resena', resena_id=r.ResenaId) }}">
+          {{ m.csrf_campo() }}<input type="hidden" name="volver" value="{{ request.path }}">
+          <button class="enlace peligro">Eliminar reseña</button>
+        </form>
+      {% endif %}
+    </article>
+  {% else %}
+    <p class="vacio">Este producto todavía no tiene reseñas.</p>
+  {% endfor %}
+</section>
+{% endblock %}

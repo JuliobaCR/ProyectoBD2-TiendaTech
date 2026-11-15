@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Auditoría{% endblock %}
+{% block contenido %}
+<h1>Auditoría</h1>
+<p class="tenue">Estos registros los escriben los triggers de SQL Server, no la aplicación: quedan aunque el cambio se haga directo desde SSMS.</p>
+
+<section class="panel">
+  <h2>Cambio masivo de precios por categoría</h2>
+  <p class="tenue">Una sola sentencia UPDATE modifica varios productos y el trigger registra una fila de auditoría por cada uno.</p>
+  <form method="post" action="{{ url_for('admin.ajuste_precios') }}" class="en-fila">
+    {{ m.csrf_campo() }}
+    <select name="categoria_id" required>{% for c in categorias %}<option value="{{ c.CategoriaId }}">{{ c.Nombre }}</option>{% endfor %}</select>
+    <label>Porcentaje <input type="number" name="porcentaje" step="0.01" required placeholder="5 sube, -5 baja" class="medio"></label>
+    <button class="boton">Aplicar cambio de precios</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Cambios de precio <small class="tenue">(TR_Producto_AuditoriaPrecio · {{ precios|length }})</small></h2>
+  <div class="tabla-envoltura">
+  <table>
+    <thead><tr><th>Fecha y hora</th><th>SKU</th><th>Producto</th><th class="num">Precio anterior</th><th class="num">Precio nuevo</th><th class="num">Diferencia</th><th>Usuario</th><th>Usuario de BD</th></tr></thead>
+    <tbody>
+    {% for a in precios %}
+      <tr><td>{{ a.Fecha|fecha_hora }}</td><td>{{ a.SKU }}</td><td>{{ a.Producto }}</td><td class="num">{{ a.PrecioAnterior|dinero }}</td>
+          <td class="num">{{ a.PrecioNuevo|dinero }}</td><td class="num">{{ a.Diferencia|dinero }}</td><td>{{ a.Usuario or '—' }}</td><td>{{ a.UsuarioBD }}</td></tr>
+    {% else %}
+      <tr><td colspan="8" class="vacio">Todavía no hay cambios de precio. Edite un producto o use el cambio masivo de arriba.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Cambios de estado de pedidos <small class="tenue">(TR_Pedido_HistorialEstado · últimos {{ estados|length }})</small></h2>
+  <div class="tabla-envoltura">
+  <table>
+    <thead><tr><th>Fecha y hora</th><th>Pedido</th><th>De</th><th>A</th><th>Usuario</th><th>Usuario de BD</th><th>Comentario</th></tr></thead>
+    <tbody>
+    {% for h in estados %}
+      <tr><td>{{ h.Fecha|fecha_hora }}</td><td><a href="{{ url_for('admin.pedido', pedido_id=h.PedidoId) }}">#{{ h.PedidoId }}</a></td>
+          <td>{{ h.EstadoAnterior or '—' }}</td><td>{{ m.estado_pedido(h.EstadoNuevo) }}</td><td>{{ h.Usuario or '—' }}</td><td>{{ h.UsuarioBD }}</td><td>{{ h.Comentario or '' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endblock %}

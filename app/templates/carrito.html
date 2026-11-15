@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% import 'macros.html' as m with context %}
+{% block titulo %}Carrito{% endblock %}
+{% block contenido %}
+<h1>Mi carrito</h1>
+{% if not lineas %}
+  <section class="panel centro">
+    <p>El carrito está vacío.</p>
+    <a class="boton" href="{{ url_for('tienda.catalogo') }}">Ver el catálogo</a>
+  </section>
+{% else %}
+<div class="con-resumen">
+  <section class="panel">
+    <table>
+      <thead><tr><th>Producto</th><th class="num">Precio</th><th>Cantidad</th><th class="num">Total</th><th></th></tr></thead>
+      <tbody>
+      {% for l in lineas %}
+        <tr>
+          <td>
+            <a href="{{ url_for('tienda.producto', producto_id=l.ProductoId) }}">{{ l.Nombre }}</a><br>
+            <small class="tenue">{{ l.SKU }}</small>
+            {% if l.Promocion %}<span class="etiqueta oferta">{{ l.Promocion }}</span>{% endif %}
+            {% if not l.Disponible %}<br><span class="etiqueta agotado">Solo hay {{ l.Existencia }} en existencia</span>{% endif %}
+          </td>
+          <td class="num">{% if l.DescuentoUnitario %}<s>{{ l.Precio|dinero }}</s><br>{% endif %}{{ l.PrecioFinal|dinero }}</td>
+          <td>
+            <form method="post" action="{{ url_for('tienda.carrito_cantidad') }}" class="en-fila">
+              {{ m.csrf_campo() }}<input type="hidden" name="producto_id" value="{{ l.ProductoId }}">
+              <input type="number" name="cantidad" value="{{ l.Cantidad }}" min="0" class="corto" required>
+              <button class="boton chico secundario">Actualizar</button>
+            </form>
+          </td>
+          <td class="num"><b>{{ l.TotalLinea|dinero }}</b></td>
+          <td>
+            <form method="post" action="{{ url_for('tienda.carrito_eliminar') }}">
+              {{ m.csrf_campo() }}<input type="hidden" name="producto_id" value="{{ l.ProductoId }}">
+              <button class="enlace peligro">Eliminar</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <form method="post" action="{{ url_for('tienda.carrito_vaciar') }}">
+      {{ m.csrf_campo() }}<button class="enlace peligro">Vaciar carrito</button>
+    </form>
+  </section>
+  <aside class="panel">
+    <h2>Resumen</h2>
+    <dl class="totales">
+      <dt>Subtotal ({{ resumen.Unidades }} unidades)</dt><dd>{{ resumen.Subtotal|dinero }}</dd>
+      <dt>Descuentos</dt><dd>− {{ resumen.Descuento|dinero }}</dd>
+      <dt>Envío{% if resumen.Zona %} ({{ resumen.Zona }}){% endif %}</dt><dd>{{ resumen.CostoEnvio|dinero }}</dd>
+      <dt class="total">Total</dt><dd class="total">{{ resumen.Total|dinero }}</dd>
+    </dl>
+    <a class="boton ancho" href="{{ url_for('tienda.checkout') }}">Continuar con la compra</a>
+    <p class="tenue">El carrito se guarda en la base de datos: sigue ahí aunque cierre la sesión.</p>
+  </aside>
+</div>
+{% endif %}
+{% endblock %}
