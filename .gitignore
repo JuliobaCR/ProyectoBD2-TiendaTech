@@ -1,0 +1,14 @@
+# Entorno de Python
+.venv/
+__pycache__/
+*.pyc
+
+# Configuración local con secretos (se versiona solo config.example.env)
+app/.env
+
+# Archivos temporales y del sistema
+*.log
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
