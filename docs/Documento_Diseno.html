@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>TiendaTech · Documento de diseño</title>
+<style>
+  @page { size: A4; margin: 18mm 15mm; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.5pt; line-height: 1.45; color: #1b2430; max-width: 185mm; margin: 0 auto; padding: 0 4mm; }
+  h1 { font-size: 19pt; color: #0f2338; border-bottom: 2px solid #0b5cab; padding-bottom: 4px; margin-top: 26px; break-before: page; }
+  h2 { font-size: 13pt; color: #0b5cab; margin-top: 18px; }
+  h3 { font-size: 11pt; margin: 14px 0 4px; }
+  p, li { text-align: justify; }
+  code { background: #eef1f5; padding: 0 3px; border-radius: 3px; font-size: 9pt; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; font-size: 9pt; }
+  th { background: #0f2338; color: #fff; text-align: left; padding: 4px 6px; }
+  td { border: 1px solid #cfd6de; padding: 3px 6px; vertical-align: top; }
+  tr { break-inside: avoid; }
+  table.dic { font-size: 8.3pt; }
+  .entidad { break-inside: avoid-page; margin-bottom: 10px; }
+  .reglas { font-size: 8.3pt; margin: 2px 0 0; padding-left: 16px; }
+  .reglas li { text-align: left; }
+  .portada { height: 250mm; display: flex; flex-direction: column; justify-content: space-between; text-align: center; }
+  .portada h1 { border: 0; font-size: 30pt; break-before: auto; margin: 0; }
+  .portada .sub { font-size: 15pt; color: #0b5cab; }
+  .portada ul { list-style: none; padding: 0; font-size: 12pt; }
+  .portada li { text-align: center; }
+  .mermaid { text-align: center; break-inside: avoid; margin: 6px 0 14px; }
+  .nota { background: #f0f6fd; border-left: 4px solid #0b5cab; padding: 6px 10px; margin: 8px 0; }
+  .indice li { text-align: left; }
+</style>
+</head>
+<body>
+
+<section class="portada">
+  <div><p style="font-size:14pt">Nombre de la institución</p><p>Bases de Datos · Grupo __</p></div>
+  <div>
+    <p class="sub">Proyecto Programado II</p>
+    <h1>TiendaTech</h1>
+    <p class="sub">Sistema de comercio electrónico con Microsoft SQL Server</p>
+    <p>Documento de diseño</p>
+  </div>
+  <div><p><b>Integrantes</b></p><ul><li>Nombre Apellido Apellido — carné</li><li>Nombre Apellido Apellido — carné</li><li>Nombre Apellido Apellido — carné</li><li>Nombre Apellido Apellido — carné</li></ul><p>Profesor: Nombre del profesor</p><p>4 de diciembre de 2026</p></div>
+</section>
+
+<h1>Contenido</h1>
+<ol class="indice">
+  <li>Descripción del negocio</li><li>Reglas de negocio</li><li>Modelo de datos</li><li>Diagrama entidad-relación</li>
+  <li>Normalización</li><li>Diccionario de datos</li><li>Índices</li><li>Decisiones de diseño</li>
+  <li>Programación en la base de datos</li><li>Pruebas y evidencias</li>
+</ol>
+<p class="nota">La base tiene 25 tablas, 80 procedimientos almacenados, 5 vistas, 3 triggers
+y 11 índices no agrupados. El diccionario de datos, las restricciones y los índices de este documento se generan
+leyendo el catálogo de la base instalada, por lo que coinciden con los scripts entregados.</p>
+
+<h1>1. Descripción del negocio</h1>
+<p><b>TiendaTech</b> es una tienda en línea de tecnología que vende laptops, celulares, tabletas, monitores, periféricos,
+audio, almacenamiento, relojes inteligentes y accesorios de diez marcas. Vende a todo el país y cobra el envío según la
+zona de entrega. Los precios están en colones.</p>
+<p>Hay dos tipos de usuario. El <b>cliente</b> consulta el catálogo, administra su perfil y sus direcciones, llena un
+carrito que se conserva entre sesiones, compra, revisa el historial de sus pedidos, los cancela mientras no se hayan
+enviado y reseña los productos que recibió. El <b>administrador</b> mantiene los catálogos, las promociones y el
+inventario, hace avanzar los pedidos por sus estados y consulta los reportes.</p>
+<p>El pago, el envío y los correos son simulados, pero su estado queda guardado en la base: cada pedido tiene un pago con
+referencia y estado, y un envío con zona, número de guía y fechas.</p>
+
+<h1>2. Reglas de negocio</h1>
+<h2>Usuarios y clientes</h2>
+<ul>
+  <li>El correo identifica al usuario y no se repite. Cada usuario tiene un solo rol.</li>
+  <li>La contraseña nunca se guarda: la aplicación calcula un hash scrypt y la base conserva solo ese hash.</li>
+  <li>La identificación del cliente no se repite. Un cliente tiene como máximo una dirección predeterminada.</li>
+  <li>Un cliente o un producto con historial no se borra: se desactiva.</li>
+</ul>
+<h2>Catálogo y promociones</h2>
+<ul>
+  <li>El SKU es único. El precio es mayor que cero y el costo no es negativo.</li>
+  <li>La tienda solo muestra productos activos cuya marca y categoría estén activas.</li>
+  <li>Una promoción descuenta un porcentaje (hasta 100) o un monto fijo, entre dos fechas; la fecha final no puede ser
+      anterior a la inicial.</li>
+  <li><b>Regla de combinación:</b> las promociones no se acumulan. Si un producto está en varias promociones vigentes se
+      aplica solo la de mayor descuento, y el descuento nunca supera el precio, así que no hay importes negativos.</li>
+  <li>El envío cuesta la tarifa de la zona de la dirección de entrega y se suma al total.</li>
+</ul>
+<h2>Carrito y compra</h2>
+<ul>
+  <li>Cada cliente tiene un carrito persistente. Un producto aparece en una sola línea; la cantidad es mayor que cero y
+      no puede superar la existencia.</li>
+  <li>La confirmación del pedido es una sola transacción: valida existencias, registra encabezado y detalle, descuenta
+      inventario, registra los movimientos, el pago y el envío, y vacía el carrito. Si algo falla no queda nada guardado.</li>
+  <li>El detalle guarda el precio, el descuento y el costo del momento. Un cambio posterior en el catálogo no altera los
+      pedidos anteriores.</li>
+  <li>Con tarjeta el pago simulado se aprueba de inmediato y el pedido queda <i>Confirmado</i>; con SINPE Móvil o
+      transferencia queda <i>Pendiente</i> hasta que el administrador confirme el pago.</li>
+</ul>
+<h2>Estados y cancelación</h2>
+<table>
+  <thead><tr><th>Estado actual</th><th>Puede pasar a</th></tr></thead>
+  <tbody>
+    <tr><td>Pendiente</td><td>Confirmado, Cancelado</td></tr>
+    <tr><td>Confirmado</td><td>En preparación, Cancelado</td></tr>
+    <tr><td>En preparación</td><td>Enviado, Cancelado</td></tr>
+    <tr><td>Enviado</td><td>Entregado</td></tr>
+    <tr><td>Entregado, Cancelado</td><td>Ninguno (estados finales)</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li>Cada cambio de estado queda en el historial con fecha, hora y usuario.</li>
+  <li>La cancelación solo es posible antes del envío. Devuelve las existencias una única vez y deja el pago como
+      reembolsado o anulado. Un pedido ya cancelado no se puede volver a cancelar.</li>
+  <li>El cliente solo cancela sus propios pedidos; el administrador puede cancelar cualquiera.</li>
+</ul>
+<h2>Inventario, reseñas y auditoría</h2>
+<ul>
+  <li>La existencia nunca es negativa y solo cambia por un movimiento (entrada, salida o ajuste) que registra cantidad,
+      fecha, usuario y motivo. La existencia siempre es igual a la suma de los movimientos.</li>
+  <li>Los movimientos no se modifican ni se borran; un error se corrige con un ajuste.</li>
+  <li>Un producto cuya existencia es menor que su mínimo aparece en la alerta del panel.</li>
+  <li>Un cliente escribe como máximo una reseña por producto, con calificación de 1 a 5, y solo de productos que compró
+      y recibió.</li>
+  <li>Todo cambio de precio queda auditado con el valor anterior, el nuevo, la fecha y el usuario.</li>
+  <li>Un pedido cancelado no cuenta como venta en ningún reporte.</li>
+</ul>
+
+<h1>3. Modelo de datos</h1>
+<p>El modelo tiene 25 tablas agrupadas en tres áreas: clientes y acceso; catálogo, inventario y promociones; y
+pedidos, pagos y envíos. Cubre todas las entidades mínimas del enunciado:</p>
+<table>
+  <thead><tr><th>Concepto del enunciado</th><th>Tabla o tablas</th></tr></thead>
+  <tbody>
+    <tr><td>Cliente, Usuario/Credencial, Rol</td><td>Cliente, Usuario, Rol</td></tr>
+    <tr><td>Dirección</td><td>Direccion, ZonaEnvio</td></tr>
+    <tr><td>Marca, Categoría, Producto, Imagen</td><td>Marca, Categoria, Producto, ProductoImagen</td></tr>
+    <tr><td>Inventario y sus movimientos</td><td>Inventario, MovimientoInventario</td></tr>
+    <tr><td>Carrito y detalle</td><td>Carrito, DetalleCarrito</td></tr>
+    <tr><td>Pedido y detalle</td><td>Pedido, DetallePedido</td></tr>
+    <tr><td>Estado e historial del pedido</td><td>EstadoPedido, TransicionEstado, HistorialEstadoPedido</td></tr>
+    <tr><td>Método de pago, pago simulado, envío</td><td>MetodoPago, Pago, Envio</td></tr>
+    <tr><td>Promoción</td><td>Promocion, PromocionProducto</td></tr>
+    <tr><td>Reseña y auditoría</td><td>Resena, AuditoriaPrecio</td></tr>
+  </tbody>
+</table>
+
+<h1>4. Diagrama entidad-relación</h1>
+<p>El diagrama se presenta en tres partes para que sea legible. Cada entidad muestra sus columnas con el tipo, la marca
+PK o FK y la palabra «opcional» cuando admite nulos. Notación de las líneas: <code>||</code> exactamente uno,
+<code>o|</code> cero o uno, <code>o{</code> cero o muchos, <code>|{</code> uno o muchos.</p>
+<h3>4.1. Clientes, acceso y carrito</h3><pre class="mermaid">erDiagram
+    Rol {
+        tinyint RolId PK
+        nvarchar Nombre
+    }
+    Usuario {
+        int UsuarioId PK
+        nvarchar Correo
+        nvarchar HashContrasena
+        tinyint RolId FK
+        bit Activo
+        datetime2 FechaCreacion
+        datetime2 UltimoAcceso &quot;opcional&quot;
+    }
+    Cliente {
+        int ClienteId PK
+        int UsuarioId FK
+        nvarchar Nombre
+        nvarchar Apellidos
+        varchar Identificacion
+        varchar Telefono &quot;opcional&quot;
+        bit Activo
+        datetime2 FechaRegistro
+    }
+    ZonaEnvio {
+        int ZonaEnvioId PK
+        nvarchar Nombre
+        decimal Tarifa
+        tinyint DiasEstimados
+        bit Activo
+    }
+    Direccion {
+        int DireccionId PK
+        int ClienteId FK
+        int ZonaEnvioId FK
+        nvarchar Alias
+        nvarchar Provincia
+        nvarchar Canton
+        nvarchar Distrito
+        nvarchar Detalle
+        bit Predeterminada
+        bit Activo
+    }
+    Carrito {
+        int CarritoId PK
+        int ClienteId FK
+        datetime2 FechaCreacion
+        datetime2 FechaActualizacion
+    }
+    DetalleCarrito {
+        int CarritoId PK, FK
+        int ProductoId PK, FK
+        int Cantidad
+        datetime2 FechaAgregado
+    }
+    Resena {
+        int ResenaId PK
+        int ClienteId FK
+        int ProductoId FK
+        tinyint Calificacion
+        nvarchar Comentario &quot;opcional&quot;
+        datetime2 Fecha
+        bit Activo
+    }
+    Rol ||--o{ Usuario : asigna
+    Usuario ||--o| Cliente : identifica
+    Cliente ||--o{ Direccion : registra
+    ZonaEnvio ||--o{ Direccion : cubre
+    Cliente ||--o| Carrito : posee
+    Carrito ||--o{ DetalleCarrito : contiene
+    Cliente ||--o{ Resena : escribe</pre><h3>4.2. Catálogo, inventario y promociones</h3><pre class="mermaid">erDiagram
+    Marca {
+        int MarcaId PK
+        nvarchar Nombre
+        nvarchar PaisOrigen &quot;opcional&quot;
+        bit Activo
+    }
+    Categoria {
+        int CategoriaId PK
+        nvarchar Nombre
+        nvarchar Descripcion &quot;opcional&quot;
+        bit Activo
+    }
+    Producto {
+        int ProductoId PK
+        varchar SKU
+        nvarchar Nombre
+        nvarchar Descripcion &quot;opcional&quot;
+        nvarchar Especificaciones &quot;opcional&quot;
+        int MarcaId FK
+        int CategoriaId FK
+        decimal Precio
+        decimal Costo
+        bit Destacado
+        bit Activo
+        datetime2 FechaCreacion
+    }
+    ProductoImagen {
+        int ImagenId PK
+        int ProductoId FK
+        nvarchar Url
+        bit EsPrincipal
+        tinyint Orden
+    }
+    Inventario {
+        int ProductoId PK, FK
+        int Existencia
+        int StockMinimo
+        datetime2 FechaActualizacion
+    }
+    MovimientoInventario {
+        int MovimientoId PK
+        int ProductoId FK
+        varchar Tipo
+        int Cantidad
+        int ExistenciaResultante
+        datetime2 Fecha
+        int UsuarioId FK
+        nvarchar Motivo
+        int PedidoId FK &quot;opcional&quot;
+    }
+    Promocion {
+        int PromocionId PK
+        nvarchar Nombre
+        char TipoDescuento
+        decimal Valor
+        date FechaInicio
+        date FechaFin
+        bit Activo
+    }
+    PromocionProducto {
+        int PromocionId PK, FK
+        int ProductoId PK, FK
+    }
+    AuditoriaPrecio {
+        int AuditoriaId PK
+        int ProductoId FK
+        decimal PrecioAnterior
+        decimal PrecioNuevo
+        datetime2 Fecha
+        int UsuarioId FK &quot;opcional&quot;
+        sysname UsuarioBD
+    }
+    Marca ||--o{ Producto : fabrica
+    Categoria ||--o{ Producto : clasifica
+    Producto ||--o{ ProductoImagen : muestra
+    Producto ||--|| Inventario : almacena
+    Producto ||--o{ MovimientoInventario : registra
+    Promocion ||--o{ PromocionProducto : incluye
+    Producto ||--o{ PromocionProducto : participa
+    Producto ||--o{ AuditoriaPrecio : audita</pre><h3>4.3. Pedidos, pagos y envíos</h3><pre class="mermaid">erDiagram
+    Pedido {
+        int PedidoId PK
+        int ClienteId FK
+        int DireccionId FK
+        tinyint EstadoId FK
+        datetime2 FechaPedido
+        decimal Subtotal
+        decimal DescuentoTotal
+        decimal CostoEnvio
+        decimal Total &quot;calculada&quot;
+    }
+    DetallePedido {
+        int PedidoId PK, FK
+        int ProductoId PK, FK
+        int Cantidad
+        decimal PrecioUnitario
+        decimal DescuentoUnitario
+        decimal CostoUnitario
+        int PromocionId FK &quot;opcional&quot;
+        decimal TotalLinea &quot;calculada&quot;
+    }
+    EstadoPedido {
+        tinyint EstadoId PK
+        nvarchar Nombre
+        bit EsFinal
+    }
+    TransicionEstado {
+        tinyint EstadoOrigenId PK, FK
+        tinyint EstadoDestinoId PK, FK
+    }
+    HistorialEstadoPedido {
+        int HistorialId PK
+        int PedidoId FK
+        tinyint EstadoAnteriorId FK &quot;opcional&quot;
+        tinyint EstadoNuevoId FK
+        datetime2 Fecha
+        int UsuarioId FK &quot;opcional&quot;
+        sysname UsuarioBD
+        nvarchar Comentario &quot;opcional&quot;
+    }
+    MetodoPago {
+        int MetodoPagoId PK
+        nvarchar Nombre
+        bit AprobacionInmediata
+        bit Activo
+    }
+    Pago {
+        int PagoId PK
+        int PedidoId FK
+        int MetodoPagoId FK
+        decimal Monto
+        varchar Estado
+        varchar Referencia
+        datetime2 Fecha
+    }
+    Envio {
+        int EnvioId PK
+        int PedidoId FK
+        int ZonaEnvioId FK
+        varchar NumeroGuia &quot;opcional&quot;
+        datetime2 FechaDespacho &quot;opcional&quot;
+        datetime2 FechaEntrega &quot;opcional&quot;
+    }
+    EstadoPedido ||--o{ Pedido : clasifica
+    Pedido ||--|{ DetallePedido : contiene
+    EstadoPedido ||--o{ TransicionEstado : permite
+    Pedido ||--o{ HistorialEstadoPedido : registra
+    Pedido ||--o| Pago : cobra
+    MetodoPago ||--o{ Pago : usa
+    Pedido ||--o| Envio : despacha</pre>
+<h3>4.4. Relaciones entre las tres partes</h3>
+<table class=""><thead><tr><th>Entidad (1)</th><th>Entidad (N)</th><th>Cardinalidad</th><th>Lectura</th></tr></thead><tbody><tr><td>Cliente</td><td>Pedido</td><td>1 : N</td><td>Un cliente hace cero o muchos pedidos; cada pedido es de un cliente.</td></tr><tr><td>Direccion</td><td>Pedido</td><td>1 : N</td><td>Cada pedido se entrega en una dirección del cliente.</td></tr><tr><td>Producto</td><td>DetallePedido</td><td>1 : N</td><td>Un producto aparece en cero o muchas líneas de pedido.</td></tr><tr><td>Producto</td><td>DetalleCarrito</td><td>1 : N</td><td>Un producto puede estar en muchos carritos.</td></tr><tr><td>Producto</td><td>Resena</td><td>1 : N</td><td>Un producto recibe cero o muchas reseñas.</td></tr><tr><td>Promocion</td><td>DetallePedido</td><td>0..1 : N</td><td>La línea guarda la promoción aplicada, si hubo (opcional).</td></tr><tr><td>Pedido</td><td>MovimientoInventario</td><td>0..1 : N</td><td>Las ventas y reintegros apuntan a su pedido; los movimientos manuales no.</td></tr><tr><td>Usuario</td><td>MovimientoInventario</td><td>1 : N</td><td>Todo movimiento registra quién lo hizo.</td></tr><tr><td>Usuario</td><td>HistorialEstadoPedido</td><td>0..1 : N</td><td>Usuario que cambió el estado (opcional si se hizo fuera de la aplicación).</td></tr><tr><td>Usuario</td><td>AuditoriaPrecio</td><td>0..1 : N</td><td>Usuario que cambió el precio (opcional).</td></tr><tr><td>ZonaEnvio</td><td>Envio</td><td>1 : N</td><td>Cada envío pertenece a una zona.</td></tr></tbody></table>
+
+<h1>5. Normalización</h1>
+<h2>Primera forma normal (1FN)</h2>
+<p>Todas las tablas tienen llave primaria y cada columna guarda un solo valor. Los grupos repetitivos se separaron en
+tablas propias: las líneas del pedido (<code>DetallePedido</code>), las líneas del carrito (<code>DetalleCarrito</code>),
+las imágenes de un producto (<code>ProductoImagen</code>), las direcciones de un cliente (<code>Direccion</code>) y los
+productos de una promoción (<code>PromocionProducto</code>). No hay columnas del tipo «Imagen1, Imagen2» ni listas
+separadas por comas que se consulten por elemento.</p>
+<h2>Segunda forma normal (2FN)</h2>
+<p>Las tablas con llave compuesta son <code>DetallePedido</code> (PedidoId, ProductoId), <code>DetalleCarrito</code>
+(CarritoId, ProductoId), <code>PromocionProducto</code> y <code>TransicionEstado</code>. En todas, cada atributo depende
+de la llave completa: la cantidad y el precio histórico de una línea dependen del pedido <i>y</i> del producto. El nombre
+del producto o la fecha del pedido, que dependen de una sola parte de la llave, están en <code>Producto</code> y en
+<code>Pedido</code>, no en el detalle.</p>
+<h2>Tercera forma normal (3FN)</h2>
+<p>Ningún atributo depende de otro que no sea llave:</p>
+<ul>
+  <li>El nombre de la marca y de la categoría están en sus tablas; <code>Producto</code> solo guarda las llaves foráneas.</li>
+  <li>La tarifa de envío depende de la zona y no de la dirección, por eso está en <code>ZonaEnvio</code>.</li>
+  <li>El nombre del estado está en <code>EstadoPedido</code> y el del método de pago en <code>MetodoPago</code>.</li>
+  <li>Los datos de acceso (correo, hash, rol) están en <code>Usuario</code> y los personales en <code>Cliente</code>.</li>
+  <li>La existencia no es un atributo de <code>Producto</code>: está en <code>Inventario</code>, con su propio ciclo de
+      actualización y bloqueo.</li>
+</ul>
+<h2>Desnormalizaciones justificadas</h2>
+<table>
+  <thead><tr><th>Dato</th><th>Por qué se guarda</th><th>Cómo se mantiene coherente</th></tr></thead>
+  <tbody>
+    <tr><td><code>DetallePedido.PrecioUnitario</code>, <code>DescuentoUnitario</code>, <code>CostoUnitario</code></td>
+        <td>No es redundancia: es un hecho histórico. El precio del catálogo cambia y el pedido debe conservar lo que se cobró.</td>
+        <td>Se copian una sola vez, dentro de la transacción del checkout.</td></tr>
+    <tr><td><code>Pedido.Subtotal</code>, <code>DescuentoTotal</code>, <code>CostoEnvio</code></td>
+        <td>Se podrían calcular sumando el detalle, pero el pedido es un documento que no debe cambiar y se lista con mucha frecuencia.</td>
+        <td>Se calculan en el checkout y nunca se actualizan. La prueba 1 y el script de datos verifican que coincidan con el detalle.</td></tr>
+    <tr><td><code>Pedido.Total</code>, <code>DetallePedido.TotalLinea</code></td>
+        <td>Valores derivados de uso constante.</td>
+        <td>Son columnas calculadas persistidas: las mantiene el motor y no pueden quedar incoherentes.</td></tr>
+    <tr><td><code>Inventario.Existencia</code></td>
+        <td>Es igual a la suma de los movimientos, pero el checkout necesita leerla y bloquearla en una sola fila para evitar la sobreventa.</td>
+        <td>Solo cambia junto con su movimiento, en la misma transacción. El procedimiento de conciliación y la prueba 13 comprueban la igualdad.</td></tr>
+    <tr><td><code>MovimientoInventario.ExistenciaResultante</code></td>
+        <td>Permite leer el kardex sin recalcular saldos acumulados.</td>
+        <td>Se escribe una vez y el movimiento es inmutable (trigger).</td></tr>
+    <tr><td><code>Direccion.Provincia</code>, <code>Canton</code>, <code>Distrito</code></td>
+        <td>Se guardan como texto y no como catálogos geográficos: el negocio solo necesita la zona de envío, que sí está normalizada.</td>
+        <td>La regla que importa (la tarifa) depende de <code>ZonaEnvioId</code>.</td></tr>
+  </tbody>
+</table>
+
+<h1>6. Diccionario de datos</h1>
+<p>Para cada tabla se indican sus columnas, tipo, si admite nulos, llaves, valor por defecto y descripción, seguidas de
+sus restricciones CHECK y UNIQUE.</p>
+<div class="entidad"><h3>Rol</h3><p>Roles del sistema: Administrador y Cliente.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>RolId</b></td><td>tinyint</td><td>No</td><td>PK</td><td></td><td>Identificador del rol.</td></tr><tr><td><b>Nombre</b></td><td>nvarchar(30)</td><td>No</td><td></td><td></td><td>Nombre.</td></tr></tbody></table><ul class="reglas"><li><code>UQ_Rol_Nombre</code> (UNIQUE): Nombre</li></ul></div><div class="entidad"><h3>Usuario</h3><p>Credencial de acceso. Guarda solo el hash de la contraseña, nunca el texto.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>UsuarioId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Usuario de la aplicación.</td></tr><tr><td><b>Correo</b></td><td>nvarchar(120)</td><td>No</td><td></td><td></td><td>Correo electrónico; es el nombre de usuario.</td></tr><tr><td><b>HashContrasena</b></td><td>nvarchar(255)</td><td>No</td><td></td><td></td><td>Hash scrypt de la contraseña.</td></tr><tr><td><b>RolId</b></td><td>tinyint</td><td>No</td><td>FK → Rol.RolId</td><td></td><td>Identificador del rol.</td></tr><tr><td><b>Activo</b></td><td>bit</td><td>No</td><td></td><td>1</td><td>Estado lógico: 1 activo, 0 inactivo (eliminación lógica).</td></tr><tr><td><b>FechaCreacion</b></td><td>datetime2(0)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha y hora de creación.</td></tr><tr><td><b>UltimoAcceso</b></td><td>datetime2(0)</td><td>Sí</td><td></td><td></td><td>Último ingreso al sistema.</td></tr></tbody></table><ul class="reglas"><li><code>CK_Usuario_Correo</code> (CHECK): ([Correo] like N&#x27;_%@_%._%&#x27;)</li><li><code>CK_Usuario_Hash</code> (CHECK): (len([HashContrasena])&gt;=(20))</li><li><code>UQ_Usuario_Correo</code> (UNIQUE): Correo</li></ul></div><div class="entidad"><h3>Cliente</h3><p>Datos personales del comprador. Relación 1:1 con Usuario.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>ClienteId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Cliente.</td></tr><tr><td><b>UsuarioId</b></td><td>int</td><td>No</td><td>FK → Usuario.UsuarioId</td><td></td><td>Credencial del cliente (relación 1:1).</td></tr><tr><td><b>Nombre</b></td><td>nvarchar(60)</td><td>No</td><td></td><td></td><td>Nombre.</td></tr><tr><td><b>Apellidos</b></td><td>nvarchar(80)</td><td>No</td><td></td><td></td><td>Apellidos del cliente.</td></tr><tr><td><b>Identificacion</b></td><td>varchar(20)</td><td>No</td><td></td><td></td><td>Número de identificación del cliente.</td></tr><tr><td><b>Telefono</b></td><td>varchar(20)</td><td>Sí</td><td></td><td></td><td>Teléfono de contacto.</td></tr><tr><td><b>Activo</b></td><td>bit</td><td>No</td><td></td><td>1</td><td>Estado lógico: 1 activo, 0 inactivo (eliminación lógica).</td></tr><tr><td><b>FechaRegistro</b></td><td>datetime2(0)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha de registro del cliente.</td></tr></tbody></table><ul class="reglas"><li><code>CK_Cliente_Nombre</code> (CHECK): (len(ltrim(rtrim([Nombre])))&gt;(0) AND len(ltrim(rtrim([Apellidos])))&gt;(0))</li><li><code>UQ_Cliente_Identificacion</code> (UNIQUE): Identificacion</li><li><code>UQ_Cliente_Usuario</code> (UNIQUE): UsuarioId</li></ul></div><div class="entidad"><h3>ZonaEnvio</h3><p>Tabla de zonas con la tarifa de envío y los días estimados de entrega.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>ZonaEnvioId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Zona de envío.</td></tr><tr><td><b>Nombre</b></td><td>nvarchar(60)</td><td>No</td><td></td><td></td><td>Nombre.</td></tr><tr><td><b>Tarifa</b></td><td>decimal(10,2)</td><td>No</td><td></td><td></td><td>Costo de envío de la zona, en colones.</td></tr><tr><td><b>DiasEstimados</b></td><td>tinyint</td><td>No</td><td></td><td></td><td>Días hábiles estimados de entrega.</td></tr><tr><td><b>Activo</b></td><td>bit</td><td>No</td><td></td><td>1</td><td>Estado lógico: 1 activo, 0 inactivo (eliminación lógica).</td></tr></tbody></table><ul class="reglas"><li><code>CK_ZonaEnvio_Dias</code> (CHECK): ([DiasEstimados]&gt;=(1) AND [DiasEstimados]&lt;=(30))</li><li><code>CK_ZonaEnvio_Tarifa</code> (CHECK): ([Tarifa]&gt;=(0))</li><li><code>UQ_ZonaEnvio_Nombre</code> (UNIQUE): Nombre</li></ul></div><div class="entidad"><h3>Direccion</h3><p>Direcciones de entrega de cada cliente; cada una pertenece a una zona de envío.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>DireccionId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Dirección de entrega.</td></tr><tr><td><b>ClienteId</b></td><td>int</td><td>No</td><td>FK → Cliente.ClienteId</td><td></td><td>Cliente.</td></tr><tr><td><b>ZonaEnvioId</b></td><td>int</td><td>No</td><td>FK → ZonaEnvio.ZonaEnvioId</td><td></td><td>Zona de envío.</td></tr><tr><td><b>Alias</b></td><td>nvarchar(40)</td><td>No</td><td></td><td></td><td>Nombre corto de la dirección (Casa, Oficina).</td></tr><tr><td><b>Provincia</b></td><td>nvarchar(40)</td><td>No</td><td></td><td></td><td>Provincia.</td></tr><tr><td><b>Canton</b></td><td>nvarchar(60)</td><td>No</td><td></td><td></td><td>Cantón.</td></tr><tr><td><b>Distrito</b></td><td>nvarchar(60)</td><td>No</td><td></td><td></td><td>Distrito.</td></tr><tr><td><b>Detalle</b></td><td>nvarchar(250)</td><td>No</td><td></td><td></td><td>Señas exactas.</td></tr><tr><td><b>Predeterminada</b></td><td>bit</td><td>No</td><td></td><td>0</td><td>1 si es la dirección por defecto del cliente.</td></tr><tr><td><b>Activo</b></td><td>bit</td><td>No</td><td></td><td>1</td><td>Estado lógico: 1 activo, 0 inactivo (eliminación lógica).</td></tr></tbody></table></div><div class="entidad"><h3>Marca</h3><p>Catálogo de marcas.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>MarcaId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Marca.</td></tr><tr><td><b>Nombre</b></td><td>nvarchar(60)</td><td>No</td><td></td><td></td><td>Nombre.</td></tr><tr><td><b>PaisOrigen</b></td><td>nvarchar(60)</td><td>Sí</td><td></td><td></td><td>País de origen de la marca.</td></tr><tr><td><b>Activo</b></td><td>bit</td><td>No</td><td></td><td>1</td><td>Estado lógico: 1 activo, 0 inactivo (eliminación lógica).</td></tr></tbody></table><ul class="reglas"><li><code>CK_Marca_Nombre</code> (CHECK): (len(ltrim(rtrim([Nombre])))&gt;(0))</li><li><code>UQ_Marca_Nombre</code> (UNIQUE): Nombre</li></ul></div><div class="entidad"><h3>Categoria</h3><p>Catálogo de categorías de producto.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>CategoriaId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Categoría.</td></tr><tr><td><b>Nombre</b></td><td>nvarchar(60)</td><td>No</td><td></td><td></td><td>Nombre.</td></tr><tr><td><b>Descripcion</b></td><td>nvarchar(250)</td><td>Sí</td><td></td><td></td><td>Descripción.</td></tr><tr><td><b>Activo</b></td><td>bit</td><td>No</td><td></td><td>1</td><td>Estado lógico: 1 activo, 0 inactivo (eliminación lógica).</td></tr></tbody></table><ul class="reglas"><li><code>CK_Categoria_Nombre</code> (CHECK): (len(ltrim(rtrim([Nombre])))&gt;(0))</li><li><code>UQ_Categoria_Nombre</code> (UNIQUE): Nombre</li></ul></div><div class="entidad"><h3>Producto</h3><p>Producto a la venta, con su precio y costo vigentes.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>ProductoId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Producto.</td></tr><tr><td><b>SKU</b></td><td>varchar(20)</td><td>No</td><td></td><td></td><td>Código único del producto.</td></tr><tr><td><b>Nombre</b></td><td>nvarchar(120)</td><td>No</td><td></td><td></td><td>Nombre.</td></tr><tr><td><b>Descripcion</b></td><td>nvarchar(500)</td><td>Sí</td><td></td><td></td><td>Descripción.</td></tr><tr><td><b>Especificaciones</b></td><td>nvarchar(1000)</td><td>Sí</td><td></td><td></td><td>Características técnicas (texto descriptivo).</td></tr><tr><td><b>MarcaId</b></td><td>int</td><td>No</td><td>FK → Marca.MarcaId</td><td></td><td>Marca.</td></tr><tr><td><b>CategoriaId</b></td><td>int</td><td>No</td><td>FK → Categoria.CategoriaId</td><td></td><td>Categoría.</td></tr><tr><td><b>Precio</b></td><td>decimal(12,2)</td><td>No</td><td></td><td></td><td>Precio de venta vigente, en colones.</td></tr><tr><td><b>Costo</b></td><td>decimal(12,2)</td><td>No</td><td></td><td></td><td>Costo vigente, en colones.</td></tr><tr><td><b>Destacado</b></td><td>bit</td><td>No</td><td></td><td>0</td><td>1 si se muestra en la sección de destacados.</td></tr><tr><td><b>Activo</b></td><td>bit</td><td>No</td><td></td><td>1</td><td>Estado lógico: 1 activo, 0 inactivo (eliminación lógica).</td></tr><tr><td><b>FechaCreacion</b></td><td>datetime2(0)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha y hora de creación.</td></tr></tbody></table><ul class="reglas"><li><code>CK_Producto_Costo</code> (CHECK): ([Costo]&gt;=(0))</li><li><code>CK_Producto_Precio</code> (CHECK): ([Precio]&gt;(0))</li><li><code>CK_Producto_SKU</code> (CHECK): (len([SKU])&gt;=(3) AND NOT [SKU] like &#x27;% %&#x27;)</li><li><code>UQ_Producto_SKU</code> (UNIQUE): SKU</li></ul></div><div class="entidad"><h3>ProductoImagen</h3><p>Imágenes (URL o ruta) de un producto; una sola es la principal.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>ImagenId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Identificador de la imagen.</td></tr><tr><td><b>ProductoId</b></td><td>int</td><td>No</td><td>FK → Producto.ProductoId</td><td></td><td>Producto.</td></tr><tr><td><b>Url</b></td><td>nvarchar(400)</td><td>No</td><td></td><td></td><td>URL o ruta de la imagen.</td></tr><tr><td><b>EsPrincipal</b></td><td>bit</td><td>No</td><td></td><td>0</td><td>1 si es la imagen principal del producto.</td></tr><tr><td><b>Orden</b></td><td>tinyint</td><td>No</td><td></td><td>1</td><td>Orden de presentación.</td></tr></tbody></table></div><div class="entidad"><h3>Inventario</h3><p>Existencia actual y mínimo de cada producto. Relación 1:1 con Producto.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>ProductoId</b></td><td>int</td><td>No</td><td>PK FK → Producto.ProductoId</td><td></td><td>Producto.</td></tr><tr><td><b>Existencia</b></td><td>int</td><td>No</td><td></td><td>0</td><td>Unidades disponibles. Nunca negativa.</td></tr><tr><td><b>StockMinimo</b></td><td>int</td><td>No</td><td></td><td>0</td><td>Mínimo de inventario; por debajo genera alerta.</td></tr><tr><td><b>FechaActualizacion</b></td><td>datetime2(0)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha del último cambio.</td></tr></tbody></table><ul class="reglas"><li><code>CK_Inventario_Existencia</code> (CHECK): ([Existencia]&gt;=(0))</li><li><code>CK_Inventario_Minimo</code> (CHECK): ([StockMinimo]&gt;=(0))</li></ul></div><div class="entidad"><h3>MovimientoInventario</h3><p>Libro de entradas, salidas y ajustes. Es inmutable: no se edita ni se borra.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>MovimientoId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Identificador del movimiento.</td></tr><tr><td><b>ProductoId</b></td><td>int</td><td>No</td><td>FK → Producto.ProductoId</td><td></td><td>Producto.</td></tr><tr><td><b>Tipo</b></td><td>varchar(10)</td><td>No</td><td></td><td></td><td>ENTRADA, SALIDA o AJUSTE.</td></tr><tr><td><b>Cantidad</b></td><td>int</td><td>No</td><td></td><td></td><td>Unidades con signo: entrada positiva, salida negativa, ajuste con su signo.</td></tr><tr><td><b>ExistenciaResultante</b></td><td>int</td><td>No</td><td></td><td></td><td>Existencia que quedó después del movimiento.</td></tr><tr><td><b>Fecha</b></td><td>datetime2(0)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha y hora del registro.</td></tr><tr><td><b>UsuarioId</b></td><td>int</td><td>No</td><td>FK → Usuario.UsuarioId</td><td></td><td>Usuario que registró el movimiento.</td></tr><tr><td><b>Motivo</b></td><td>nvarchar(200)</td><td>No</td><td></td><td></td><td>Razón del movimiento.</td></tr><tr><td><b>PedidoId</b></td><td>int</td><td>Sí</td><td>FK → Pedido.PedidoId</td><td></td><td>Pedido que originó el movimiento (venta o reintegro); NULL si es manual.</td></tr></tbody></table><ul class="reglas"><li><code>CK_Movimiento_Motivo</code> (CHECK): (len(ltrim(rtrim([Motivo])))&gt;(0))</li><li><code>CK_Movimiento_Resultante</code> (CHECK): ([ExistenciaResultante]&gt;=(0))</li><li><code>CK_Movimiento_Signo</code> (CHECK): ([Tipo]=&#x27;ENTRADA&#x27; AND [Cantidad]&gt;(0) OR [Tipo]=&#x27;SALIDA&#x27; AND [Cantidad]&lt;(0) OR [Tipo]=&#x27;AJUSTE&#x27; AND [Cantidad]&lt;&gt;(0))</li><li><code>CK_Movimiento_Tipo</code> (CHECK): ([Tipo]=&#x27;AJUSTE&#x27; OR [Tipo]=&#x27;SALIDA&#x27; OR [Tipo]=&#x27;ENTRADA&#x27;)</li></ul></div><div class="entidad"><h3>Carrito</h3><p>Carrito persistente; uno por cliente.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>CarritoId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Carrito.</td></tr><tr><td><b>ClienteId</b></td><td>int</td><td>No</td><td>FK → Cliente.ClienteId</td><td></td><td>Cliente.</td></tr><tr><td><b>FechaCreacion</b></td><td>datetime2(0)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha y hora de creación.</td></tr><tr><td><b>FechaActualizacion</b></td><td>datetime2(0)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha del último cambio.</td></tr></tbody></table><ul class="reglas"><li><code>UQ_Carrito_Cliente</code> (UNIQUE): ClienteId</li></ul></div><div class="entidad"><h3>DetalleCarrito</h3><p>Productos y cantidades dentro de un carrito.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>CarritoId</b></td><td>int</td><td>No</td><td>PK FK → Carrito.CarritoId</td><td></td><td>Carrito.</td></tr><tr><td><b>ProductoId</b></td><td>int</td><td>No</td><td>PK FK → Producto.ProductoId</td><td></td><td>Producto.</td></tr><tr><td><b>Cantidad</b></td><td>int</td><td>No</td><td></td><td></td><td>Cantidad de unidades.</td></tr><tr><td><b>FechaAgregado</b></td><td>datetime2(0)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha en que se agregó la línea.</td></tr></tbody></table><ul class="reglas"><li><code>CK_DetCarrito_Cantidad</code> (CHECK): ([Cantidad]&gt;(0))</li></ul></div><div class="entidad"><h3>Promocion</h3><p>Descuento por porcentaje o monto fijo, con período de vigencia.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>PromocionId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Promoción.</td></tr><tr><td><b>Nombre</b></td><td>nvarchar(80)</td><td>No</td><td></td><td></td><td>Nombre.</td></tr><tr><td><b>TipoDescuento</b></td><td>char(1)</td><td>No</td><td></td><td></td><td>P = porcentaje, M = monto fijo.</td></tr><tr><td><b>Valor</b></td><td>decimal(12,2)</td><td>No</td><td></td><td></td><td>Porcentaje o monto del descuento.</td></tr><tr><td><b>FechaInicio</b></td><td>date</td><td>No</td><td></td><td></td><td>Primer día de vigencia.</td></tr><tr><td><b>FechaFin</b></td><td>date</td><td>No</td><td></td><td></td><td>Último día de vigencia.</td></tr><tr><td><b>Activo</b></td><td>bit</td><td>No</td><td></td><td>1</td><td>Estado lógico: 1 activo, 0 inactivo (eliminación lógica).</td></tr></tbody></table><ul class="reglas"><li><code>CK_Promocion_Fechas</code> (CHECK): ([FechaFin]&gt;=[FechaInicio])</li><li><code>CK_Promocion_Tipo</code> (CHECK): ([TipoDescuento]=&#x27;M&#x27; OR [TipoDescuento]=&#x27;P&#x27;)</li><li><code>CK_Promocion_Valor</code> (CHECK): ([Valor]&gt;(0) AND ([TipoDescuento]=&#x27;M&#x27; OR [Valor]&lt;=(100)))</li><li><code>UQ_Promocion_Nombre</code> (UNIQUE): Nombre</li></ul></div><div class="entidad"><h3>PromocionProducto</h3><p>Relación N:M entre promociones y productos.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>PromocionId</b></td><td>int</td><td>No</td><td>PK FK → Promocion.PromocionId</td><td></td><td>Promoción.</td></tr><tr><td><b>ProductoId</b></td><td>int</td><td>No</td><td>PK FK → Producto.ProductoId</td><td></td><td>Producto.</td></tr></tbody></table></div><div class="entidad"><h3>EstadoPedido</h3><p>Catálogo de estados del pedido.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>EstadoId</b></td><td>tinyint</td><td>No</td><td>PK</td><td></td><td>Estado del pedido.</td></tr><tr><td><b>Nombre</b></td><td>nvarchar(30)</td><td>No</td><td></td><td></td><td>Nombre.</td></tr><tr><td><b>EsFinal</b></td><td>bit</td><td>No</td><td></td><td>0</td><td>1 si el estado no admite más cambios.</td></tr></tbody></table><ul class="reglas"><li><code>UQ_EstadoPedido_Nombre</code> (UNIQUE): Nombre</li></ul></div><div class="entidad"><h3>TransicionEstado</h3><p>Transiciones permitidas entre estados (regla de negocio guardada como datos).</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>EstadoOrigenId</b></td><td>tinyint</td><td>No</td><td>PK FK → EstadoPedido.EstadoId</td><td></td><td>Estado de partida.</td></tr><tr><td><b>EstadoDestinoId</b></td><td>tinyint</td><td>No</td><td>PK FK → EstadoPedido.EstadoId</td><td></td><td>Estado de llegada permitido.</td></tr></tbody></table><ul class="reglas"><li><code>CK_Transicion_Distintos</code> (CHECK): ([EstadoOrigenId]&lt;&gt;[EstadoDestinoId])</li></ul></div><div class="entidad"><h3>MetodoPago</h3><p>Formas de pago simuladas y si aprueban de inmediato.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>MetodoPagoId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Método de pago.</td></tr><tr><td><b>Nombre</b></td><td>nvarchar(40)</td><td>No</td><td></td><td></td><td>Nombre.</td></tr><tr><td><b>AprobacionInmediata</b></td><td>bit</td><td>No</td><td></td><td></td><td>1 si el pago simulado se aprueba en el checkout.</td></tr><tr><td><b>Activo</b></td><td>bit</td><td>No</td><td></td><td>1</td><td>Estado lógico: 1 activo, 0 inactivo (eliminación lógica).</td></tr></tbody></table><ul class="reglas"><li><code>UQ_MetodoPago_Nombre</code> (UNIQUE): Nombre</li></ul></div><div class="entidad"><h3>Pedido</h3><p>Encabezado del pedido con sus importes históricos.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>PedidoId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Pedido.</td></tr><tr><td><b>ClienteId</b></td><td>int</td><td>No</td><td>FK → Cliente.ClienteId</td><td></td><td>Cliente.</td></tr><tr><td><b>DireccionId</b></td><td>int</td><td>No</td><td>FK → Direccion.DireccionId</td><td></td><td>Dirección de entrega.</td></tr><tr><td><b>EstadoId</b></td><td>tinyint</td><td>No</td><td>FK → EstadoPedido.EstadoId</td><td>1</td><td>Estado del pedido.</td></tr><tr><td><b>FechaPedido</b></td><td>datetime2(0)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha y hora de la compra.</td></tr><tr><td><b>Subtotal</b></td><td>decimal(14,2)</td><td>No</td><td></td><td></td><td>Suma de cantidad por precio histórico, antes de descuentos.</td></tr><tr><td><b>DescuentoTotal</b></td><td>decimal(14,2)</td><td>No</td><td></td><td>0</td><td>Suma de los descuentos aplicados.</td></tr><tr><td><b>CostoEnvio</b></td><td>decimal(10,2)</td><td>No</td><td></td><td>0</td><td>Tarifa de envío cobrada en el pedido.</td></tr><tr><td><b>Total</b></td><td>decimal(14,2)</td><td>Sí</td><td></td><td>CALCULADA</td><td>Subtotal - DescuentoTotal + CostoEnvio (columna calculada).</td></tr></tbody></table><ul class="reglas"><li><code>CK_Pedido_Importes</code> (CHECK): ([Subtotal]&gt;=(0) AND [DescuentoTotal]&gt;=(0) AND [DescuentoTotal]&lt;=[Subtotal] AND [CostoEnvio]&gt;=(0))</li></ul></div><div class="entidad"><h3>DetallePedido</h3><p>Líneas del pedido con precio, descuento y costo del momento de la compra.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>PedidoId</b></td><td>int</td><td>No</td><td>PK FK → Pedido.PedidoId</td><td></td><td>Pedido.</td></tr><tr><td><b>ProductoId</b></td><td>int</td><td>No</td><td>PK FK → Producto.ProductoId</td><td></td><td>Producto.</td></tr><tr><td><b>Cantidad</b></td><td>int</td><td>No</td><td></td><td></td><td>Cantidad de unidades.</td></tr><tr><td><b>PrecioUnitario</b></td><td>decimal(12,2)</td><td>No</td><td></td><td></td><td>Precio de venta histórico de la línea.</td></tr><tr><td><b>DescuentoUnitario</b></td><td>decimal(12,2)</td><td>No</td><td></td><td>0</td><td>Descuento histórico por unidad.</td></tr><tr><td><b>CostoUnitario</b></td><td>decimal(12,2)</td><td>No</td><td></td><td></td><td>Costo histórico por unidad (para rentabilidad).</td></tr><tr><td><b>PromocionId</b></td><td>int</td><td>Sí</td><td>FK → Promocion.PromocionId</td><td></td><td>Promoción aplicada a la línea; NULL si no hubo.</td></tr><tr><td><b>TotalLinea</b></td><td>decimal(14,2)</td><td>Sí</td><td></td><td>CALCULADA</td><td>Cantidad por (PrecioUnitario - DescuentoUnitario) (columna calculada).</td></tr></tbody></table><ul class="reglas"><li><code>CK_DetPedido_Cantidad</code> (CHECK): ([Cantidad]&gt;(0))</li><li><code>CK_DetPedido_Descuento</code> (CHECK): ([DescuentoUnitario]&gt;=(0) AND [DescuentoUnitario]&lt;=[PrecioUnitario])</li><li><code>CK_DetPedido_Precio</code> (CHECK): ([PrecioUnitario]&gt;(0) AND [CostoUnitario]&gt;=(0))</li></ul></div><div class="entidad"><h3>HistorialEstadoPedido</h3><p>Cada cambio de estado de un pedido, con fecha y usuario. Lo llena un trigger.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>HistorialId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Identificador del registro de historial.</td></tr><tr><td><b>PedidoId</b></td><td>int</td><td>No</td><td>FK → Pedido.PedidoId</td><td></td><td>Pedido.</td></tr><tr><td><b>EstadoAnteriorId</b></td><td>tinyint</td><td>Sí</td><td>FK → EstadoPedido.EstadoId</td><td></td><td>Estado previo (NULL al crear el pedido).</td></tr><tr><td><b>EstadoNuevoId</b></td><td>tinyint</td><td>No</td><td>FK → EstadoPedido.EstadoId</td><td></td><td>Estado al que pasó el pedido.</td></tr><tr><td><b>Fecha</b></td><td>datetime2(3)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha y hora del registro.</td></tr><tr><td><b>UsuarioId</b></td><td>int</td><td>Sí</td><td>FK → Usuario.UsuarioId</td><td></td><td>Usuario de la aplicación que hizo el cambio.</td></tr><tr><td><b>UsuarioBD</b></td><td>sysname</td><td>No</td><td></td><td>original_login</td><td>Inicio de sesión de SQL Server que ejecutó el cambio.</td></tr><tr><td><b>Comentario</b></td><td>nvarchar(250)</td><td>Sí</td><td></td><td></td><td>Comentario o motivo.</td></tr></tbody></table></div><div class="entidad"><h3>Pago</h3><p>Pago simulado del pedido (uno por pedido).</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>PagoId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Identificador del pago.</td></tr><tr><td><b>PedidoId</b></td><td>int</td><td>No</td><td>FK → Pedido.PedidoId</td><td></td><td>Pedido.</td></tr><tr><td><b>MetodoPagoId</b></td><td>int</td><td>No</td><td>FK → MetodoPago.MetodoPagoId</td><td></td><td>Método de pago.</td></tr><tr><td><b>Monto</b></td><td>decimal(14,2)</td><td>No</td><td></td><td></td><td>Monto pagado; igual al total del pedido.</td></tr><tr><td><b>Estado</b></td><td>varchar(12)</td><td>No</td><td></td><td></td><td>PENDIENTE, APROBADO, REEMBOLSADO o ANULADO.</td></tr><tr><td><b>Referencia</b></td><td>varchar(40)</td><td>No</td><td></td><td></td><td>Comprobante simulado, único.</td></tr><tr><td><b>Fecha</b></td><td>datetime2(0)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha y hora del registro.</td></tr></tbody></table><ul class="reglas"><li><code>CK_Pago_Estado</code> (CHECK): ([Estado]=&#x27;ANULADO&#x27; OR [Estado]=&#x27;REEMBOLSADO&#x27; OR [Estado]=&#x27;APROBADO&#x27; OR [Estado]=&#x27;PENDIENTE&#x27;)</li><li><code>CK_Pago_Monto</code> (CHECK): ([Monto]&gt;(0))</li><li><code>UQ_Pago_Pedido</code> (UNIQUE): PedidoId</li><li><code>UQ_Pago_Referencia</code> (UNIQUE): Referencia</li></ul></div><div class="entidad"><h3>Envio</h3><p>Envío simulado: zona, número de guía, fechas de despacho y entrega.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>EnvioId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Identificador del envío.</td></tr><tr><td><b>PedidoId</b></td><td>int</td><td>No</td><td>FK → Pedido.PedidoId</td><td></td><td>Pedido.</td></tr><tr><td><b>ZonaEnvioId</b></td><td>int</td><td>No</td><td>FK → ZonaEnvio.ZonaEnvioId</td><td></td><td>Zona de envío.</td></tr><tr><td><b>NumeroGuia</b></td><td>varchar(30)</td><td>Sí</td><td></td><td></td><td>Guía del transportista; se asigna al despachar.</td></tr><tr><td><b>FechaDespacho</b></td><td>datetime2(0)</td><td>Sí</td><td></td><td></td><td>Fecha de salida de bodega.</td></tr><tr><td><b>FechaEntrega</b></td><td>datetime2(0)</td><td>Sí</td><td></td><td></td><td>Fecha de entrega al cliente.</td></tr></tbody></table><ul class="reglas"><li><code>CK_Envio_Fechas</code> (CHECK): ([FechaEntrega] IS NULL OR [FechaDespacho] IS NOT NULL AND [FechaEntrega]&gt;=[FechaDespacho])</li><li><code>UQ_Envio_Pedido</code> (UNIQUE): PedidoId</li></ul></div><div class="entidad"><h3>Resena</h3><p>Calificación de 1 a 5 y comentario de un cliente sobre un producto.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>ResenaId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Identificador de la reseña.</td></tr><tr><td><b>ClienteId</b></td><td>int</td><td>No</td><td>FK → Cliente.ClienteId</td><td></td><td>Cliente.</td></tr><tr><td><b>ProductoId</b></td><td>int</td><td>No</td><td>FK → Producto.ProductoId</td><td></td><td>Producto.</td></tr><tr><td><b>Calificacion</b></td><td>tinyint</td><td>No</td><td></td><td></td><td>Calificación de 1 a 5.</td></tr><tr><td><b>Comentario</b></td><td>nvarchar(500)</td><td>Sí</td><td></td><td></td><td>Comentario o motivo.</td></tr><tr><td><b>Fecha</b></td><td>datetime2(0)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha y hora del registro.</td></tr><tr><td><b>Activo</b></td><td>bit</td><td>No</td><td></td><td>1</td><td>Estado lógico: 1 activo, 0 inactivo (eliminación lógica).</td></tr></tbody></table><ul class="reglas"><li><code>CK_Resena_Calificacion</code> (CHECK): ([Calificacion]&gt;=(1) AND [Calificacion]&lt;=(5))</li><li><code>UQ_Resena_Cliente_Producto</code> (UNIQUE): ClienteId, ProductoId</li></ul></div><div class="entidad"><h3>AuditoriaPrecio</h3><p>Auditoría de cambios de precio. La llena un trigger.</p><table class="dic"><thead><tr><th>Columna</th><th>Tipo</th><th>Nulo</th><th>Llave</th><th>Defecto / generación</th><th>Descripción</th></tr></thead><tbody><tr><td><b>AuditoriaId</b></td><td>int</td><td>No</td><td>PK</td><td>IDENTITY</td><td>Identificador del registro de auditoría.</td></tr><tr><td><b>ProductoId</b></td><td>int</td><td>No</td><td>FK → Producto.ProductoId</td><td></td><td>Producto.</td></tr><tr><td><b>PrecioAnterior</b></td><td>decimal(12,2)</td><td>No</td><td></td><td></td><td>Precio antes del cambio.</td></tr><tr><td><b>PrecioNuevo</b></td><td>decimal(12,2)</td><td>No</td><td></td><td></td><td>Precio después del cambio.</td></tr><tr><td><b>Fecha</b></td><td>datetime2(3)</td><td>No</td><td></td><td>sysdatetime</td><td>Fecha y hora del registro.</td></tr><tr><td><b>UsuarioId</b></td><td>int</td><td>Sí</td><td>FK → Usuario.UsuarioId</td><td></td><td>Usuario de la aplicación que cambió el precio.</td></tr><tr><td><b>UsuarioBD</b></td><td>sysname</td><td>No</td><td></td><td>original_login</td><td>Inicio de sesión de SQL Server que ejecutó el cambio.</td></tr></tbody></table></div>
+
+<h1>7. Índices</h1>
+<p>Además de los índices que crean las llaves primarias y las restricciones UNIQUE, se definieron 11 índices no
+agrupados. Ocho responden a consultas frecuentes y tres son índices únicos filtrados que hacen cumplir una regla de
+negocio.</p>
+<table class="dic"><thead><tr><th>Índice</th><th>Tabla</th><th>Columnas clave</th><th>Columnas incluidas</th><th>Único</th><th>Filtro</th><th>Justificación</th></tr></thead><tbody><tr><td><code>IX_DetallePedido_Producto</code></td><td>DetallePedido</td><td>ProductoId</td><td>Cantidad, PrecioUnitario, DescuentoUnitario, CostoUnitario</td><td>No</td><td>-</td><td>Ventas por producto (R5, R7). La clave primaria empieza por PedidoId y no sirve para buscar por producto.</td></tr><tr><td><code>UX_Direccion_Predeterminada</code></td><td>Direccion</td><td>ClienteId</td><td>-</td><td>Sí</td><td>([Predeterminada]=(1) AND [Activo]=(1))</td><td>Índice único filtrado: como máximo una dirección predeterminada activa por cliente.</td></tr><tr><td><code>UX_Envio_NumeroGuia</code></td><td>Envio</td><td>NumeroGuia</td><td>-</td><td>Sí</td><td>([NumeroGuia] IS NOT NULL)</td><td>Índice único filtrado: la guía no se repite, pero puede estar vacía en varios envíos.</td></tr><tr><td><code>IX_Movimiento_Producto_Fecha</code></td><td>MovimientoInventario</td><td>ProductoId, Fecha</td><td>Tipo, Cantidad</td><td>No</td><td>-</td><td>Kardex de un producto y conciliación de inventario.</td></tr><tr><td><code>IX_Pedido_Cliente_Fecha</code></td><td>Pedido</td><td>ClienteId, FechaPedido DESC</td><td>EstadoId, Subtotal, DescuentoTotal, CostoEnvio</td><td>No</td><td>-</td><td>Historial de pedidos de un cliente ordenado del más reciente al más antiguo; también sirve a R1 y R8.</td></tr><tr><td><code>IX_Pedido_Fecha</code></td><td>Pedido</td><td>FechaPedido</td><td>EstadoId, ClienteId</td><td>No</td><td>-</td><td>Reportes por rango de fechas (R4, R9, R10): evita recorrer todos los pedidos.</td></tr><tr><td><code>IX_Producto_Categoria</code></td><td>Producto</td><td>CategoriaId, Activo</td><td>Nombre, Precio, MarcaId, SKU</td><td>No</td><td>-</td><td>Catálogo filtrado por categoría, la consulta más frecuente de la tienda. Incluye nombre, precio y marca para no leer la tabla.</td></tr><tr><td><code>IX_Producto_Marca</code></td><td>Producto</td><td>MarcaId, Activo</td><td>Nombre, Precio, CategoriaId, SKU</td><td>No</td><td>-</td><td>Filtro por marca y reportes por marca (R3).</td></tr><tr><td><code>UX_ProductoImagen_Principal</code></td><td>ProductoImagen</td><td>ProductoId</td><td>-</td><td>Sí</td><td>([EsPrincipal]=(1))</td><td>Índice único filtrado: una sola imagen principal por producto.</td></tr><tr><td><code>IX_PromocionProducto_Producto</code></td><td>PromocionProducto</td><td>ProductoId</td><td>-</td><td>No</td><td>-</td><td>Buscar las promociones de un producto; la clave primaria empieza por PromocionId.</td></tr><tr><td><code>IX_Resena_Producto</code></td><td>Resena</td><td>ProductoId, Activo</td><td>Calificacion</td><td>No</td><td>-</td><td>Reseñas y calificación promedio que muestra cada tarjeta del catálogo.</td></tr></tbody></table>
+<h2>Evidencia de utilidad</h2>
+<p>El script <code>sql/09_evidencia_indices.sql</code> carga dentro de una transacción un volumen temporal de 40 000
+pedidos y 120 000 líneas, ejecuta cada consulta forzando el recorrido del índice agrupado y luego con el índice no
+agrupado, y revierte todo. Lecturas lógicas medidas con <code>SET STATISTICS IO ON</code>:</p>
+<table>
+  <thead><tr><th>Consulta</th><th>Índice</th><th>Sin el índice</th><th>Con el índice</th></tr></thead>
+  <tbody>
+    <tr><td>Historial de pedidos de un cliente</td><td><code>IX_Pedido_Cliente_Fecha</code></td><td>324 lecturas</td><td>2 lecturas</td></tr>
+    <tr><td>Pedidos de una semana</td><td><code>IX_Pedido_Fecha</code></td><td>324</td><td>6</td></tr>
+    <tr><td>Ventas de un producto</td><td><code>IX_DetallePedido_Producto</code></td><td>917</td><td>19</td></tr>
+    <tr><td>Catálogo de una categoría</td><td><code>IX_Producto_Categoria</code></td><td>5</td><td>2</td></tr>
+  </tbody>
+</table>
+<p>En SSMS, con el plan de ejecución real activado, la primera variante muestra un <i>Clustered Index Scan</i> y la segunda
+un <i>Index Seek</i>.</p>
+
+<h1>8. Decisiones de diseño</h1>
+<h2>Política de eliminación</h2>
+<ul>
+  <li><b>Eliminación lógica</b> (columna <code>Activo</code>) en clientes, usuarios, productos, marcas, categorías,
+      promociones, direcciones y reseñas. Lo desactivado deja de mostrarse, pero el historial lo conserva.</li>
+  <li><b>Eliminación física</b> solo de marcas y categorías sin productos, líneas del carrito, imágenes y productos de
+      una promoción, que no tienen historial.</li>
+  <li>Todas las llaves foráneas usan <code>NO ACTION</code>: la base impide borrar un registro referenciado. No se usa
+      borrado en cascada.</li>
+  <li>Pedidos, pagos, movimientos de inventario y auditoría nunca se borran.</li>
+</ul>
+<h2>Tipos de datos</h2>
+<ul>
+  <li>Dinero en <code>DECIMAL(12,2)</code> o <code>DECIMAL(14,2)</code>, nunca en tipos de punto flotante.</li>
+  <li>Fechas con hora en <code>DATETIME2</code> y vigencias en <code>DATE</code>.</li>
+  <li>Texto con tildes en <code>NVARCHAR</code>; códigos como SKU, teléfono o referencia en <code>VARCHAR</code>.</li>
+  <li>Indicadores en <code>BIT</code> con valor por defecto.</li>
+</ul>
+<h2>Transacciones y concurrencia</h2>
+<p>El descuento de inventario del checkout es una sola sentencia
+<code>UPDATE … SET Existencia = Existencia - Cantidad WHERE Existencia &gt;= Cantidad</code>. Es atómica y bloquea las
+filas que modifica: si dos sesiones compran la última unidad, la segunda espera y, cuando la primera confirma, ya no
+cumple la condición. El procedimiento compara las filas actualizadas con las líneas del carrito y, si no coinciden, lanza
+el error 51003 y revierte todo. La restricción <code>CHECK (Existencia &gt;= 0)</code> es la última barrera. La prueba 10
+lo demuestra con dos conexiones simultáneas.</p>
+<p>La cancelación y el cambio de estado leen el pedido con <code>UPDLOCK</code> dentro de la transacción, de modo que dos
+cancelaciones simultáneas no pueden reintegrar el inventario dos veces.</p>
+<h2>Transiciones de estado como datos</h2>
+<p>Las transiciones válidas están en la tabla <code>TransicionEstado</code> y no escritas en el código. El procedimiento
+solo pregunta si existe la fila (estado actual, estado nuevo); agregar un flujo nuevo es insertar filas.</p>
+<h2>Triggers</h2>
+<p>Se usan solo donde aportan algo que un procedimiento no garantiza: la auditoría debe registrarse aunque alguien cambie
+un precio o un estado con un <code>UPDATE</code> directo desde SSMS. Trabajan con las tablas <code>inserted</code> y
+<code>deleted</code> completas, sin variables escalares ni cursores, por lo que funcionan igual con una o con muchas
+filas. El usuario de la aplicación les llega por <code>SESSION_CONTEXT</code>. La lógica de compra no está en triggers.</p>
+<h2>Seguridad</h2>
+<ul>
+  <li>La aplicación solo ejecuta procedimientos almacenados y siempre con parámetros; no arma SQL con texto del usuario.</li>
+  <li>Opera con el usuario de base de datos <code>app_tiendatech</code>, que solo tiene permiso <code>EXECUTE</code>. Un
+      <code>SELECT</code> directo a una tabla le devuelve «permission denied».</li>
+  <li>No hay credenciales administrativas en el código: la configuración está en un archivo <code>.env</code> que no se
+      versiona.</li>
+  <li>El único SQL dinámico está en el reporte R2 (PIVOT con una columna por categoría). Los nombres de columna salen de
+      la tabla <code>Categoria</code> y pasan por <code>QUOTENAME</code>; las fechas viajan como parámetros de
+      <code>sp_executesql</code>.</li>
+</ul>
+
+<h1>9. Programación en la base de datos</h1>
+<h2>Procedimientos almacenados (80)</h2>
+<table>
+  <thead><tr><th>Grupo</th><th>Cant.</th><th>Procedimientos (prefijo <code>usp_Grupo_</code>)</th></tr></thead>
+  <tbody><tr><td><b>Admin</b></td><td>1</td><td>Resumen</td></tr><tr><td><b>Auditoria</b></td><td>2</td><td>Estados, Precios</td></tr><tr><td><b>Carrito</b></td><td>6</td><td>Agregar, CambiarCantidad, EliminarLinea, Obtener, Resumen, Vaciar</td></tr><tr><td><b>Catalogo</b></td><td>2</td><td>Buscar, Detalle</td></tr><tr><td><b>Categoria</b></td><td>4</td><td>Actualizar, Crear, Eliminar, Listar</td></tr><tr><td><b>Cliente</b></td><td>5</td><td>Actualizar, CambiarEstado, Listar, Obtener, Registrar</td></tr><tr><td><b>Direccion</b></td><td>4</td><td>Actualizar, Crear, Eliminar, ListarPorCliente</td></tr><tr><td><b>EstadoPedido</b></td><td>1</td><td>Listar</td></tr><tr><td><b>Inventario</b></td><td>4</td><td>BajoMinimo, Conciliacion, Movimientos, RegistrarMovimiento</td></tr><tr><td><b>Marca</b></td><td>4</td><td>Actualizar, Crear, Eliminar, Listar</td></tr><tr><td><b>MetodoPago</b></td><td>1</td><td>Listar</td></tr><tr><td><b>Pedido</b></td><td>8</td><td>CambiarEstado, Cancelar, Confirmar, Detalle, Historial, ListarPorCliente, Obtener, TransicionesDisponibles</td></tr><tr><td><b>Producto</b></td><td>6</td><td>Actualizar, AjustarPrecioCategoria, CambiarEstado, Crear, ListarAdmin, Obtener</td></tr><tr><td><b>ProductoImagen</b></td><td>3</td><td>Agregar, Eliminar, Listar</td></tr><tr><td><b>Promocion</b></td><td>7</td><td>Actualizar, AsignarCategoria, AsignarProducto, Crear, Listar, ListarProductos, QuitarProducto</td></tr><tr><td><b>Reporte</b></td><td>12</td><td>R1_TopClientes, R10_PedidosPorEstado, R10_ResumenPedidos, R2_ClienteCategoriaDetalle, R2_MatrizClienteCategoria, R3_VentasMensualesPorMarca, R4_EvolucionMensual, R5_ProductosMasVendidos, R6_InventarioCritico, R7_Rentabilidad, R8_ClientesSinCompras, R9_ComparacionMensual</td></tr><tr><td><b>Resena</b></td><td>6</td><td>Actualizar, Crear, Eliminar, Estado, ListarPorCliente, ListarPorProducto</td></tr><tr><td><b>Usuario</b></td><td>3</td><td>CambiarContrasena, ObtenerPorCorreo, RegistrarAcceso</td></tr><tr><td><b>ZonaEnvio</b></td><td>1</td><td>Listar</td></tr></tbody>
+</table>
+<ul>
+  <li><b>Parámetros OUTPUT:</b> todos los procedimientos <code>_Crear</code>, <code>usp_Cliente_Registrar</code>,
+      <code>usp_Pedido_Confirmar</code> y <code>usp_Inventario_RegistrarMovimiento</code> devuelven el identificador creado.</li>
+  <li><b>Transacciones explícitas</b> con <code>TRY…CATCH</code>, <code>BEGIN TRAN</code>, <code>COMMIT</code>,
+      <code>ROLLBACK</code> y <code>THROW</code>: <code>usp_Pedido_Confirmar</code>, <code>usp_Pedido_Cancelar</code>,
+      <code>usp_Pedido_CambiarEstado</code>, <code>usp_Inventario_RegistrarMovimiento</code>, <code>usp_Cliente_Registrar</code>,
+      <code>usp_Producto_Crear</code> y <code>usp_Producto_Actualizar</code>, entre otros.</li>
+  <li><b>Errores de negocio:</b> números 51000 a 51007 con mensajes legibles que la aplicación muestra tal cual.</li>
+</ul>
+<h2>Vistas, función y triggers</h2>
+<p>Vistas: <code>vw_CatalogoDisponible</code>, <code>vw_InventarioBajoMinimo</code>, <code>vw_ResumenComercial</code>, <code>vw_ResumenPedidos</code>, <code>vw_VentasDetalle</code>. Función: <code>fn_MejorPromocion</code>.</p>
+<ul><li><code>TR_MovimientoInventario_Inmutable (sobre MovimientoInventario)</code></li><li><code>TR_Pedido_HistorialEstado (sobre Pedido)</code></li><li><code>TR_Producto_AuditoriaPrecio (sobre Producto)</code></li></ul>
+<h2>Reportes</h2>
+<table>
+  <thead><tr><th>Reporte</th><th>Procedimiento</th><th>Técnica principal</th></tr></thead>
+  <tbody>
+    <tr><td>R1 Top clientes</td><td><code>usp_Reporte_R1_TopClientes</code></td><td>GROUP BY, HAVING, ROW_NUMBER</td></tr>
+    <tr><td>R2 Matriz cliente × categoría</td><td><code>usp_Reporte_R2_MatrizClienteCategoria</code></td><td>PIVOT</td></tr>
+    <tr><td>R3 Ventas mensuales por marca</td><td><code>usp_Reporte_R3_VentasMensualesPorMarca</code></td><td>Agregación condicional, LEFT JOIN</td></tr>
+    <tr><td>R4 Evolución mensual</td><td><code>usp_Reporte_R4_EvolucionMensual</code></td><td>CTE de calendario, LEFT JOIN</td></tr>
+    <tr><td>R5 Productos más vendidos</td><td><code>usp_Reporte_R5_ProductosMasVendidos</code></td><td>RANK</td></tr>
+    <tr><td>R6 Inventario crítico</td><td><code>usp_Reporte_R6_InventarioCritico</code></td><td>Vista, subconsulta derivada</td></tr>
+    <tr><td>R7 Rentabilidad</td><td><code>usp_Reporte_R7_Rentabilidad</code></td><td>Agregación sobre costo histórico</td></tr>
+    <tr><td>R8 Clientes sin compras</td><td><code>usp_Reporte_R8_ClientesSinCompras</code></td><td>NOT EXISTS</td></tr>
+    <tr><td>R9 Comparación temporal</td><td><code>usp_Reporte_R9_ComparacionMensual</code></td><td>LAG</td></tr>
+    <tr><td>R10 Resumen de pedidos</td><td><code>usp_Reporte_R10_ResumenPedidos</code></td><td>Filtros parametrizados</td></tr>
+  </tbody>
+</table>
+<p>Todos leen la vista <code>vw_VentasDetalle</code>, que excluye los pedidos cancelados y usa el importe histórico del
+detalle, así la regla está escrita una sola vez.</p>
+
+<h1>10. Pruebas y evidencias</h1>
+<p>Las pruebas están en <code>sql/07_pruebas.sql</code> (una sola ejecución imprime datos esperados, obtenidos y el
+resultado) y en <code>pruebas/prueba_concurrencia.py</code>. El README indica cómo reproducirlas y cómo repetirlas desde
+la interfaz.</p>
+<table class=""><thead><tr><th>Prueba</th><th>Caso</th><th>Resultado esperado y obtenido</th><th>Estado</th></tr></thead><tbody><tr><td>1</td><td>Compra exitosa y descuento de inventario</td><td>Existencias -2 y -3; pedido Confirmado</td><td>PASA</td></tr><tr><td>2</td><td>Compra fallida por falta de existencias</td><td>Error 51003; @@TRANCOUNT = 0; sin pedido</td><td>PASA</td></tr><tr><td>3</td><td>Dos productos, uno sin stock</td><td>Error 51003; ningún inventario afectado</td><td>PASA</td></tr><tr><td>4a</td><td>Cancelación y reintegro</td><td>Existencia vuelve al valor original; pago REEMBOLSADO</td><td>PASA</td></tr><tr><td>4b</td><td>Segunda cancelación</td><td>Error 51004; sin reintegro duplicado</td><td>PASA</td></tr><tr><td>5a / 5b</td><td>Transiciones inválidas</td><td>Error 51004; el estado no cambia</td><td>PASA</td></tr><tr><td>6</td><td>Cambio de precio</td><td>Catálogo +10 %; importe histórico idéntico</td><td>PASA</td></tr><tr><td>7a–7d</td><td>Duplicados y valores inválidos</td><td>Errores 51002, 2627 y 547</td><td>PASA</td></tr><tr><td>8a / 8b</td><td>Triggers con varias filas</td><td>Una fila de auditoría por fila modificada</td><td>PASA</td></tr><tr><td>9</td><td>Reporte R4 contra consulta directa</td><td>Totales idénticos (₡59 146 750 en 34 pedidos)</td><td>PASA</td></tr><tr><td>10</td><td>Dos compras simultáneas, stock 1</td><td>Una confirma, la otra recibe 51003; existencia 0</td><td>PASA</td></tr><tr><td>11a / 11b</td><td>Reglas de inventario</td><td>Errores 51003 y 51006</td><td>PASA</td></tr><tr><td>12a / 12b</td><td>Reglas de reseñas</td><td>Errores 51002 y 51006</td><td>PASA</td></tr><tr><td>13</td><td>Conciliación de inventario</td><td>0 diferencias; 0 existencias negativas</td><td>PASA</td></tr></tbody></table>
+<p class="nota">Las capturas de pantalla de la ejecución de las pruebas y de los reportes se entregan en la carpeta
+<code>docs/evidencias</code>.</p>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: false, theme: "neutral", er: { useMaxWidth: true } });
+  let numero = 0;   // identificadores propios: evita que dos diagramas compartan id
+  for (const nodo of document.querySelectorAll("pre.mermaid")) {
+    const { svg } = await mermaid.render("diagrama-er-" + (++numero), nodo.textContent);
+    nodo.innerHTML = svg;
+  }
+</script>
+</body>
+</html>
