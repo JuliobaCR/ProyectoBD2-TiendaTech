@@ -20,8 +20,17 @@
           <noscript><button class="boton chico secundario">Recalcular envío</button></noscript>
         </form>
       {% else %}
-        <p class="aviso aviso">Todavía no tiene direcciones. <a href="{{ url_for('tienda.perfil') }}">Agregue una en su perfil</a> para poder comprar.</p>
+        <p class="aviso aviso">Todavía no tiene direcciones. Agregue una para poder comprar.</p>
       {% endif %}
+      <details class="caja nueva-direccion" {{ 'open' if not direcciones }}>
+        <summary>Entregar en otra dirección</summary>
+        <form method="post" action="{{ url_for('tienda.direccion_crear') }}" class="formulario">
+          {{ m.csrf_campo() }}
+          <input type="hidden" name="volver" value="checkout">
+          {{ m.campos_direccion(none) }}
+          <button class="boton">Guardar y usar esta dirección</button>
+        </form>
+      </details>
     </section>
 
     <form method="post" id="confirmar">

@@ -87,3 +87,22 @@
   </tbody>
 </table>
 {% endmacro %}
+
+{# Campos de una dirección; lo usan el perfil y el checkout. #}
+{% macro campos_direccion(d) %}
+  <div class="dos">
+    <label>Alias <input name="alias" value="{{ d.Alias if d else '' }}" placeholder="Casa, oficina…" required maxlength="40"></label>
+    <label>Zona de envío
+      <select name="zona_id" required>
+        {% for z in zonas %}<option value="{{ z.ZonaEnvioId }}" {{ 'selected' if d and d.ZonaEnvioId == z.ZonaEnvioId }}>{{ z.Nombre }} — {{ z.Tarifa|dinero }}</option>{% endfor %}
+      </select>
+    </label>
+  </div>
+  <div class="tres-campos">
+    <label>Provincia <input name="provincia" value="{{ d.Provincia if d else '' }}" required maxlength="40"></label>
+    <label>Cantón <input name="canton" value="{{ d.Canton if d else '' }}" required maxlength="60"></label>
+    <label>Distrito <input name="distrito" value="{{ d.Distrito if d else '' }}" required maxlength="60"></label>
+  </div>
+  <label>Señas exactas <input name="detalle" value="{{ d.Detalle if d else '' }}" required maxlength="250"></label>
+  <label class="casilla"><input type="checkbox" name="predeterminada" value="1" {{ 'checked' if d and d.Predeterminada }}> Usar como dirección predeterminada</label>
+{% endmacro %}

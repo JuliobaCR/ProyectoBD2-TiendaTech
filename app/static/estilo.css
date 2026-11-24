@@ -104,7 +104,10 @@ textarea { resize: vertical; }
 .formulario label { display: grid; gap: .3rem; font-size: .84rem; font-weight: 600; color: #344054; }
 .formulario label input, .formulario label select, .formulario label textarea { font-weight: 400; width: 100%; font-size: .95rem; color: var(--texto); }
 .formulario .casilla, .formulario .opcion { display: flex; gap: .6rem; align-items: flex-start; font-weight: 400; font-size: .92rem; }
-.formulario .casilla input, .opcion input { width: 1.05rem; flex: none; margin-top: .22rem; }
+.formulario .casilla input, .opcion input, .formulario .opcion input { width: 1.05rem; flex: none; margin-top: .22rem; }
+.formulario .opcion { margin-bottom: 0; }
+.nueva-direccion { margin-top: .9rem; margin-bottom: 0; }
+.nueva-direccion summary { font-weight: 600; color: var(--primario); }
 .opcion { display: flex; gap: .7rem; align-items: flex-start; padding: .8rem .9rem; border: 1px solid var(--borde); border-radius: 11px; margin-bottom: .55rem; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
 .opcion:hover { border-color: #b3bcc9; }
 .opcion:has(input:checked) { border-color: var(--primario); background: var(--primario-suave); box-shadow: 0 0 0 1px var(--primario) inset; }

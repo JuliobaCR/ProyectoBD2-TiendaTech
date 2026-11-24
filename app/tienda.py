@@ -192,6 +192,7 @@ def checkout():
         direccion_id = direcciones[0]["DireccionId"] if direcciones else None
     return render_template("checkout.html", lineas=lineas, direcciones=direcciones, direccion_id=direccion_id,
                            metodos=db.filas("usp_MetodoPago_Listar"),
+                           zonas=db.filas("usp_ZonaEnvio_Listar"),
                            resumen=db.fila("usp_Carrito_Resumen", ClienteId=_cid(), DireccionId=direccion_id))
 
 
@@ -274,9 +275,12 @@ def _datos_direccion():
 @bp.post("/direcciones")
 @requiere_cliente
 def direccion_crear():
-    intentar(lambda: db.ejecutar_con_salida("usp_Direccion_Crear", "DireccionId", ClienteId=_cid(), **_datos_direccion()),
-             "Dirección agregada.")
-    return redirect(request.form.get("volver") or url_for("tienda.perfil"))
+    ok, direccion_id = intentar(lambda: db.ejecutar_con_salida("usp_Direccion_Crear", "DireccionId", ClienteId=_cid(),
+                                                               **_datos_direccion()), "Dirección agregada.")
+    # Desde el checkout se vuelve a él con la dirección nueva ya seleccionada.
+    if request.form.get("volver") == "checkout":
+        return redirect(url_for("tienda.checkout", direccion=direccion_id) if ok else url_for("tienda.checkout"))
+    return redirect(url_for("tienda.perfil"))
 
 
 @bp.post("/direcciones/<int:direccion_id>")
